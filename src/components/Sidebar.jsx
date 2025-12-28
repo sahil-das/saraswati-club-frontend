@@ -6,6 +6,7 @@ import {
   Wallet,
   FileText,
   X,
+  Archive,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -102,6 +103,19 @@ export default function Sidebar({ open, setOpen }) {
           <FileText size={18} />
           Expenses
         </NavLink>
+
+        {/* HISTORY (PREVIOUS YEARS) */}
+        {user.role === "admin" && (
+          <NavLink
+            to="/dashboard/history"
+            className={({ isActive }) =>
+              `${linkClass} ${isActive ? activeClass : ""}`
+            }
+          >
+            <Archive size={18} />
+            History
+          </NavLink>
+        )}
 
         {/* REPORTS (ADMIN ONLY) */}
         {user.role === "admin" && (

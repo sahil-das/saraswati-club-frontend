@@ -1,10 +1,13 @@
 import { Menu, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation } from "react-router-dom";
+import { useYear } from "../context/YearContext";
 
 export default function Navbar({ setOpen }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+
+  const { year, setYear, availableYears } = useYear();
 
   /* ===== PAGE TITLE BASED ON ROUTE ===== */
   const getTitle = () => {
@@ -44,6 +47,9 @@ export default function Navbar({ setOpen }) {
         <span className="hidden sm:block text-gray-600">
           {user.email}
         </span>
+
+
+
 
         <button
           onClick={logout}

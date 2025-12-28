@@ -10,6 +10,7 @@ import {
 import { useFinance } from "../context/FinanceContext";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
+import { useYear } from "../context/YearContext";
 
 export default function DashboardHome() {
   const {
@@ -21,6 +22,7 @@ export default function DashboardHome() {
   } = useFinance();
 
   const { user } = useAuth();
+  const { year } = useYear();
 
   const totalCollection =
     weeklyTotal + pujaTotal + donationTotal;
@@ -36,6 +38,11 @@ export default function DashboardHome() {
           Saraswati Puja Committee Dashboard
         </p>
       </div>
+
+      <p className="text-sm text-gray-500">
+        Financial Year: <span className="font-semibold">{year}</span>
+      </p>
+
 
       {/* ================= KPI CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

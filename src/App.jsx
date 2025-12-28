@@ -15,7 +15,7 @@ import Donations from "./pages/Donations";
 import MemberDetails from "./pages/MemberDetails";
 import CollectionsOverview from "./pages/CollectionsOverview";
 import PujaContributions from "./pages/PujaContributions";
-
+import History from "./pages/History";
 export default function App() {
   return (
     <AuthProvider>
@@ -59,6 +59,16 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route 
+              path="/dashboard/history"
+              element={
+                <ProtectedRoute>
+                  <Dashboard>
+                    <History />
+                  </Dashboard>
+                </ProtectedRoute>
+              }/>
+            
             <Route
               path="/dashboard/puja-contributions"
               element={
