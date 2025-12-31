@@ -170,8 +170,7 @@ export default function WeeklyContributions() {
             exportWeeklyAllMembersPDF({
               clubName: "Saraswati Club",
               members,
-              totalWeeks: cycle.totalWeeks,
-              weekAmount: cycle.weeklyAmount,
+              cycle, // pass cycle object (was passing totalWeeks / weekAmount)
             })
           }
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg mb-6"

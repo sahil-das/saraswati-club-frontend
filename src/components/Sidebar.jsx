@@ -7,6 +7,7 @@ import {
   FileText,
   X,
   Archive,
+  Settings,   // ✅ NEW
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -14,7 +15,7 @@ export default function Sidebar({ open, setOpen }) {
   const { user } = useAuth();
   const location = useLocation();
 
-  // Auto-close sidebar on route change (mobile UX)
+  // 🔹 Auto-close sidebar on route change (mobile UX)
   useEffect(() => {
     setOpen(false);
   }, [location.pathname, setOpen]);
@@ -31,7 +32,7 @@ export default function Sidebar({ open, setOpen }) {
       transform transition-transform duration-300
       ${open ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
     >
-      {/* HEADER */}
+      {/* ================= HEADER ================= */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-indigo-600">
           Saraswati Puja
@@ -45,7 +46,7 @@ export default function Sidebar({ open, setOpen }) {
         </button>
       </div>
 
-      {/* NAVIGATION */}
+      {/* ================= NAVIGATION ================= */}
       <nav className="space-y-2">
         {/* DASHBOARD */}
         <NavLink
@@ -59,7 +60,7 @@ export default function Sidebar({ open, setOpen }) {
         </NavLink>
 
         {/* MEMBERS (ADMIN ONLY) */}
-        {user.role === "admin" && (
+        {user?.role === "admin" && (
           <NavLink
             to="/dashboard/members"
             className={({ isActive }) =>
@@ -71,7 +72,7 @@ export default function Sidebar({ open, setOpen }) {
           </NavLink>
         )}
 
-        {/* WEEKLY CONTRIBUTIONS */}
+        {/* WEEKLY */}
         <NavLink
           to="/dashboard/weekly"
           className={({ isActive }) =>
@@ -104,8 +105,8 @@ export default function Sidebar({ open, setOpen }) {
           Expenses
         </NavLink>
 
-        {/* HISTORY (PREVIOUS YEARS) */}
-        {user.role === "admin" && (
+        {/* HISTORY (ADMIN ONLY) */}
+        {user?.role === "admin" && (
           <NavLink
             to="/dashboard/history"
             className={({ isActive }) =>
@@ -118,7 +119,7 @@ export default function Sidebar({ open, setOpen }) {
         )}
 
         {/* REPORTS (ADMIN ONLY) */}
-        {user.role === "admin" && (
+        {user?.role === "admin" && (
           <NavLink
             to="/dashboard/reports"
             className={({ isActive }) =>
@@ -127,6 +128,19 @@ export default function Sidebar({ open, setOpen }) {
           >
             <FileText size={18} />
             Reports
+          </NavLink>
+        )}
+
+        {/* ⚙️ SETTINGS (ADMIN ONLY) */}
+        {user?.role === "admin" && (
+          <NavLink
+            to="/dashboard/settings"
+            className={({ isActive }) =>
+              `${linkClass} ${isActive ? activeClass : ""}`
+            }
+          >
+            <Settings size={18} />
+            Settings
           </NavLink>
         )}
       </nav>

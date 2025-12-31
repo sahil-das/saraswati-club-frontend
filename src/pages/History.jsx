@@ -1,11 +1,25 @@
-import { useState } from "react";
-import { IndianRupee, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  IndianRupee,
+  ChevronDown,
+  ChevronUp,
+  Download,
+} from "lucide-react";
+import api from "../api/axios";
 import { exportHistoryYearPDF } from "../utils/pdfExport";
 import { useAuth } from "../context/AuthContext";
 
 export default function History() {
-  const availableYears = [2024, 2023, 2022];
-  const [year, setYear] = useState(2024);
+  const { user } = useAuth();
+
+  const [years, setYears] = useState([]);
+  const [year, setYear] = useState(null);
+  const [summary, setSummary] = useState(null);
+
+  const [weekly, setWeekly] = useState([]);
+  const [puja, setPuja] = useState([]);
+  const [donations, setDonations] = useState([]);
+  const [expenses, setExpenses] = useState([]);
 
   const [open, setOpen] = useState({
     weekly: false,
@@ -14,198 +28,191 @@ export default function History() {
     expenses: false,
   });
 
-  const { user } = useAuth();
+  /* ================= LOAD YEARS ================= */
+  useEffect(() => {
+    const loadYears = async () => {
+      const res = await api.get("/cycles");
+      const yearsSet = new Set();
 
-  const [closedYears, setClosedYears] = useState([2023]); // mock closed years
+      res.data.data.forEach((c) => {
+        yearsSet.add(new Date(c.startDate).getFullYear());
+        yearsSet.add(new Date(c.endDate).getFullYear());
+      });
 
-  const isClosed = closedYears.includes(year);
-
-  const closeYear = () => {
-    if (!window.confirm(`Close financial year ${year}? This cannot be undone.`))
-      return;
-
-    // calculate closing balance
-    const closingBalance = data.openingBalance + data.collections - data.expenses;
-
-    // mark year closed
-    setClosedYears((prev) => [...prev, year]);
-
-    // auto-carry to next year
-    historyData[year + 1] = {
-      openingBalance: closingBalance,
-      collections: 0,
-      expenses: 0,
-      closingBalance: 0,
-      weekly: [],
-      puja: [],
-      donations: [],
-      expensesList: [],
+      const arr = [...yearsSet].sort((a, b) => b - a);
+      setYears(arr);
+      setYear(arr[0]);
     };
 
-    alert(`Year ${year} closed. Opening balance for ${year + 1} set to ₹${closingBalance}`);
-  };
+    loadYears();
+  }, []);
 
-  /* ================= MOCK HISTORY DATA ================= */
-  const historyData = {
-    2024: {
-      openingBalance: 3200,
-      collections: 45000,
-      expenses: 41800,
-      closingBalance: 6400,
+  /* ================= LOAD YEAR DATA ================= */
+  useEffect(() => {
+    if (!year) return;
 
-      weekly: [
-        { member: "Rahul Kumar", amount: 5200 },
-        { member: "Amit Singh", amount: 5000 },
-      ],
+    const load = async () => {
+      const [s, w, p, d, e] = await Promise.all([
+        api.get(`/history/${year}/summary`),
+        api.get(`/history/${year}/weekly`),
+        api.get(`/history/${year}/puja`),
+        api.get(`/history/${year}/donations`),
+        api.get(`/history/${year}/expenses`),
+      ]);
 
-      puja: [
-        { member: "Rahul Kumar", amount: 1500, date: "2024-02-12" },
-        { member: "Amit Singh", amount: 1200, date: "2024-02-13" },
-      ],
+      setSummary(s.data.data);
+      setWeekly(w.data.data);
+      setPuja(p.data.data);
+      setDonations(d.data.data);
+      setExpenses(e.data.data);
+    };
 
-      donations: [
-        { name: "Ramesh Sharma", amount: 2000, date: "2024-02-10" },
-        { name: "Anita Devi", amount: 1500, date: "2024-02-12" },
-      ],
+    load();
+  }, [year]);
 
-      expensesList: [
-        { title: "Decoration", amount: 1800, date: "2024-02-11" },
-        { title: "Puja Samagri", amount: 2500, date: "2024-02-09" },
-      ],
-    },
-  };
+  if (!summary) {
+    return <p className="text-gray-500">Loading history…</p>;
+  }
 
-  const data = historyData[year];
+  /* ================= TOTALS ================= */
+  const weeklyTotal = weekly.reduce((s, r) => s + r.total, 0);
+  const pujaTotal = puja.reduce((s, r) => s + r.total, 0);
+  const donationTotal = donations.reduce((s, r) => s + r.amount, 0);
+  const expenseTotal = expenses.reduce((s, r) => s + r.amount, 0);
 
-  const toggle = (key) =>
-    setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (k) =>
+    setOpen((p) => ({ ...p, [k]: !p[k] }));
 
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div>
-        <h2 className="text-xl font-semibold">Financial History</h2>
-        <p className="text-sm text-gray-500">
-          Previous years data (read-only)
-        </p>
-      </div>
-
-      {/* YEAR SELECT + EXPORT */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-        <div className="bg-white p-4 rounded-xl shadow max-w-xs">
-          <label className="text-sm font-medium">Select Year</label>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="w-full border rounded-lg px-3 py-2 mt-1"
-          >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-semibold">
+            Financial History
+          </h2>
+          <p className="text-sm text-gray-500">
+            Previous year audit (read-only)
+          </p>
         </div>
 
         <button
-          onClick={() => exportHistoryYearPDF(year, data)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+          onClick={() =>
+            exportHistoryYearPDF(year, {
+              summary,
+              weekly,
+              puja,
+              donations,
+              expenses,
+            })
+          }
+          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg"
         >
           <Download size={16} />
           Export PDF
         </button>
-
-        {user.role === "admin" && !isClosed && (
-          <button
-            onClick={closeYear}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-          >
-            Close Year
-          </button>
-        )}
-
-        {isClosed && (
-          <span className="text-sm text-green-600 font-medium">
-            Year Closed ✔
-          </span>
-        )}
       </div>
+
+      {/* YEAR SELECT */}
+      <select
+        value={year}
+        onChange={(e) => setYear(Number(e.target.value))}
+        className="border rounded-lg px-3 py-2"
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
 
       {/* SUMMARY */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <SummaryCard label="Opening Balance" value={data.openingBalance} />
-        <SummaryCard label="Total Collection" value={data.collections} />
-        <SummaryCard label="Total Expenses" value={data.expenses} />
+        <SummaryCard label="Opening Balance" value={summary.openingBalance} />
+        <SummaryCard label="Total Collection" value={summary.collections} />
+        <SummaryCard label="Expenses" value={summary.expenses} />
         <SummaryCard
           label="Closing Balance"
-          value={data.closingBalance}
+          value={summary.closingBalance}
           highlight
         />
       </div>
 
-      {/* COLLAPSIBLE SECTIONS */}
+      {/* WEEKLY */}
       <Collapsible
         title="Weekly Contributions"
+        total={weeklyTotal}
         open={open.weekly}
-        onToggle={() => toggle("weekly")}
+        toggle={() => toggle("weekly")}
       >
-        {data.weekly.map((w, i) => (
-          <Row key={i} label={w.member} value={w.amount} />
-        ))}
+        <Table
+          columns={["Member", "Total"]}
+          rows={weekly.map((r) => [
+            r.memberName,
+            `₹ ${r.total}`,
+          ])}
+        />
       </Collapsible>
 
+      {/* PUJA */}
       <Collapsible
         title="Puja Contributions"
+        total={pujaTotal}
         open={open.puja}
-        onToggle={() => toggle("puja")}
+        toggle={() => toggle("puja")}
       >
-        {data.puja.map((p, i) => (
-          <Row
-            key={i}
-            label={`${p.member} (${p.date})`}
-            value={p.amount}
-          />
-        ))}
+        <Table
+          columns={["Member", "Total"]}
+          rows={puja.map((r) => [
+            r.memberName,
+            `₹ ${r.total}`,
+          ])}
+        />
       </Collapsible>
 
+      {/* DONATIONS */}
       <Collapsible
         title="Outside Donations"
+        total={donationTotal}
         open={open.donations}
-        onToggle={() => toggle("donations")}
+        toggle={() => toggle("donations")}
       >
-        {data.donations.map((d, i) => (
-          <Row
-            key={i}
-            label={`${d.name} (${d.date})`}
-            value={d.amount}
-          />
-        ))}
+        <Table
+          columns={["Donor", "Amount", "Date"]}
+          rows={donations.map((r) => [
+            r.donorName,
+            `₹ ${r.amount}`,
+            r.date,
+          ])}
+        />
       </Collapsible>
 
+      {/* EXPENSES */}
       <Collapsible
         title="Expenses"
+        total={expenseTotal}
         open={open.expenses}
-        onToggle={() => toggle("expenses")}
+        toggle={() => toggle("expenses")}
       >
-        {data.expensesList.map((e, i) => (
-          <Row
-            key={i}
-            label={`${e.title} (${e.date})`}
-            value={e.amount}
-            negative
-          />
-        ))}
+        <Table
+          columns={["Title", "Amount", "Date"]}
+          rows={expenses.map((r) => [
+            r.title,
+            `₹ ${r.amount}`,
+            r.date,
+          ])}
+        />
       </Collapsible>
     </div>
   );
 }
 
-/* ================= SMALL COMPONENTS ================= */
+/* ================= COMPONENTS ================= */
 
 function SummaryCard({ label, value, highlight }) {
   return (
     <div
-      className={`rounded-xl shadow p-5 flex items-center gap-4 ${
+      className={`rounded-xl shadow p-5 flex gap-4 ${
         highlight ? "bg-indigo-600 text-white" : "bg-white"
       }`}
     >
@@ -220,37 +227,50 @@ function SummaryCard({ label, value, highlight }) {
   );
 }
 
-function Collapsible({ title, open, onToggle, children }) {
+function Collapsible({ title, total, open, toggle, children }) {
   return (
     <div className="bg-white rounded-xl shadow">
       <button
-        onClick={onToggle}
+        onClick={toggle}
         className="w-full flex justify-between items-center p-4 font-semibold"
       >
-        {title}
-        {open ? <ChevronUp /> : <ChevronDown />}
+        <span>{title}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-green-600">₹ {total}</span>
+          {open ? <ChevronUp /> : <ChevronDown />}
+        </span>
       </button>
 
-      {open && (
-        <div className="border-t p-4 space-y-2">
-          {children}
-        </div>
-      )}
+      {open && <div className="border-t p-4">{children}</div>}
     </div>
   );
 }
 
-function Row({ label, value, negative }) {
+function Table({ columns, rows }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span>{label}</span>
-      <span
-        className={`font-semibold ${
-          negative ? "text-red-600" : "text-green-600"
-        }`}
-      >
-        ₹ {value}
-      </span>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            {columns.map((c) => (
+              <th key={c} className="p-2 text-left">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-t">
+              {r.map((v, j) => (
+                <td key={j} className="p-2">
+                  {v}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

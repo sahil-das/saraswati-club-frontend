@@ -16,6 +16,8 @@ import MemberDetails from "./pages/MemberDetails";
 import CollectionsOverview from "./pages/CollectionsOverview";
 import PujaContributions from "./pages/PujaContributions";
 import History from "./pages/History";
+import Settings from "./pages/Settings";
+
 export default function App() {
   return (
     <AuthProvider>
@@ -68,7 +70,17 @@ export default function App() {
                   </Dashboard>
                 </ProtectedRoute>
               }/>
-            
+              <Route
+                path="/dashboard/settings"
+                element={
+                  <ProtectedRoute role="admin">
+                    <Dashboard>
+                      <Settings />
+                    </Dashboard>
+                  </ProtectedRoute>
+                }
+              />
+
             <Route
               path="/dashboard/puja-contributions"
               element={
