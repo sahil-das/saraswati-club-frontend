@@ -1,29 +1,43 @@
 import { useParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
-import { CheckCircle } from "lucide-react";
+import { markWeekPaid, undoWeekPaid } from "../api/weekly";
+import { IndianRupee, PlusCircle, ChevronDown } from "lucide-react";
+import { useFinance } from "../context/FinanceContext";
 
 export default function MemberDetails() {
   const { memberId } = useParams();
   const { user } = useAuth();
   const { fetchCentralFund } = useFinance();
 
+  const [member, setMember] = useState(null);
+  const [weeks, setWeeks] = useState([]);
   const [cycle, setCycle] = useState(null);
-  const [paidWeeks, setPaidWeeks] = useState([]);
-  const [selectedWeeks, setSelectedWeeks] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 🟣 PUJA
+  const [pujaTotal, setPujaTotal] = useState(0);
+  const [pujaRecords, setPujaRecords] = useState([]);
+  const [amount, setAmount] = useState("");
+
+  // 🔽 WEEK TOGGLE
+  const [weeksExpanded, setWeeksExpanded] = useState(false);
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
+    if (!memberId) return;
+
     const loadData = async () => {
       try {
-        const cycleRes = await api.get("/cycles/active");
-        setCycle(cycleRes.data.data);
+        const memberRes = await api.get(`/members/${memberId}`);
+        setMember(memberRes.data.data);
 
-        const weeklyRes = await api.get(
-          `/weekly/member/${memberId}`
-        );
-        setPaidWeeks(weeklyRes.data.data.paidWeeks);
+        const weeklyRes = await api.get(`/weekly/member/${memberId}`);
+        setWeeks(weeklyRes.data.weeks);
+        setCycle(weeklyRes.data.cycle);
+
+        await loadPuja();
       } catch (err) {
         console.error(err);
       } finally {
@@ -34,24 +48,34 @@ export default function MemberDetails() {
     loadData();
   }, [memberId]);
 
-  /* ================= SELECT WEEK ================= */
-  const toggleWeek = (week) => {
-    if (paidWeeks.includes(week)) return;
+  /* ================= PUJA ================= */
+  const loadPuja = async () => {
+    const res = await api.get(`/puja-contributions/member/${memberId}`);
+    setPujaTotal(res.data.total);
+    setPujaRecords(res.data.records);
+  };
 
-    setSelectedWeeks((prev) =>
-      prev.includes(week)
-        ? prev.filter((w) => w !== week)
-        : [...prev, week]
+  /* ================= WEEKLY ================= */
+  const handleMarkPaid = async (week) => {
+    if (!window.confirm(`Mark Week ${week} as paid?`)) return;
+    await markWeekPaid(memberId, week);
+
+    setWeeks((prev) =>
+      prev.map((w) =>
+        w.week === week
+          ? { ...w, paid: true, paidAt: new Date().toISOString() }
+          : w
+      )
     );
   };
 
-  /* ================= PAY SELECTED ================= */
-  const payWeeks = async () => {
-    if (selectedWeeks.length === 0) return;
+  const handleUndoPaid = async (week) => {
+    if (!window.confirm("Undo this payment?")) return;
+    await undoWeekPaid(memberId, week);
 
-    if (
-      !window.confirm(
-        `Pay weeks: ${selectedWeeks.join(", ")} ?`
+    setWeeks((prev) =>
+      prev.map((w) =>
+        w.week === week ? { ...w, paid: false, paidAt: null } : w
       )
     );
   };
@@ -60,105 +84,94 @@ export default function MemberDetails() {
   const addPujaContribution = async () => {
     if (!amount) return;
 
-    await api.post("/weekly/pay", {
-      userId: memberId,
-      cycleId: cycle._id,
-      weeks: selectedWeeks,
-    });
+    try {
+      await api.post("/puja-contributions", {
+        memberId: member._id,
+        amount: Number(amount),
+      });
 
-    setSelectedWeeks([]);
-
-    // reload status
-    const res = await api.get(
-      `/weekly/member/${memberId}`
-    );
-    setPaidWeeks(res.data.data.paidWeeks);
+      setAmount("");        // ✅ correct state
+      await loadPuja();     // ✅ reload puja data
+      fetchCentralFund();   // ✅ update dashboard totals
+    } catch (err) {
+      console.error("Puja add error", err);
+      alert("Failed to add puja contribution");
+    }
   };
 
+  /* ================= UI STATES ================= */
   if (loading) {
-    return <p>Loading...</p>;
-  }
-
-  if (!cycle) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg text-yellow-800">
-        <p className="font-medium">No active Puja cycle</p>
-        <p className="text-sm mt-1">
-          Admin must create a new cycle before contributions can start.
-        </p>
+      <div className="p-6 text-center text-gray-500">
+        Loading member details…
       </div>
     );
   }
 
-  /* ================= RENDER ================= */
+  if (!member) {
+    return (
+      <div className="p-6 text-center text-red-500">
+        Member not found
+      </div>
+    );
+  }
+
+  const paidCount = weeks.filter((w) => w.paid).length;
+
   return (
     <div className="space-y-6">
+      {/* HEADER */}
       <div>
-        <h2 className="text-xl font-semibold">
-          Weekly Contributions
-        </h2>
-        <p className="text-sm text-gray-500">
-          {cycle.name} • ₹{cycle.weeklyAmount}/week
-        </p>
+        <h2 className="text-xl font-semibold">{member.name}</h2>
+        <p className="text-sm text-gray-500">{member.email}</p>
       </div>
 
-      {/* WEEK GRID */}
-      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-3">
-        {Array.from(
-          { length: cycle.totalWeeks },
-          (_, i) => {
-            const week = i + 1;
-            const isPaid = paidWeeks.includes(week);
-            const isSelected =
-              selectedWeeks.includes(week);
-
-            return (
-              <div
-                key={week}
-                onClick={() =>
-                  user.role === "admin" &&
-                  toggleWeek(week)
-                }
-                className={`p-3 rounded-lg text-center text-sm cursor-pointer select-none
-                  ${
-                    isPaid
-                      ? "bg-green-100 text-green-700"
-                      : isSelected
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100"
-                  }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  {isPaid && <CheckCircle size={14} />}
-                  W{week}
-                </div>
-              </div>
-            );
-          }
-        )}
-      </div>
-
-      {/* ADMIN ACTION */}
-      {user.role === "admin" && (
-        <div className="bg-white p-4 rounded-xl shadow">
-          <p className="text-sm mb-3">
-            Selected weeks:{" "}
-            <strong>
-              {selectedWeeks.join(", ") || "None"}
-            </strong>
+      {/* CYCLE */}
+      {cycle && (
+        <div className="bg-indigo-50 p-4 rounded-lg text-sm">
+          <p className="font-medium">Active Cycle: {cycle.name}</p>
+          <p>
+            {cycle.startDate.slice(0, 10)} →{" "}
+            {cycle.endDate.slice(0, 10)}
           </p>
+        </div>
+      )}
+
+      {/* PUJA TOTAL */}
+      <div className="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+        <div className="bg-indigo-600 text-white p-3 rounded-lg">
+          <IndianRupee />
+        </div>
+        <div>
+          <p className="text-sm text-gray-500">
+            Total Puja Contribution
+          </p>
+          <h3 className="text-xl font-bold">₹ {pujaTotal}</h3>
+        </div>
+      </div>
+
+      {/* ADD PUJA */}
+      {user.role === "admin" && (
+        <div className="bg-white rounded-xl shadow p-5 max-w-sm">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <PlusCircle size={18} />
+            Add Puja Contribution
+          </h3>
+
+          <input
+            type="number"
+            placeholder="Amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 mb-3"
+          />
 
           <button
-            onClick={payWeeks}
-            disabled={selectedWeeks.length === 0}
-            className="bg-indigo-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg"
+            onClick={addPujaContribution}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg w-full"
           >
-            Pay Selected Weeks
+            Add Contribution
           </button>
-
-          <p className="text-xs text-gray-500 mt-2">
-            * Only admin can add or update Puja-time contributions
-          </p>
         </div>
       )}
       {/* PUJA CONTRIBUTION TABLE */}
