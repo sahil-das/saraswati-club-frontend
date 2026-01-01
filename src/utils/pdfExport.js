@@ -1,170 +1,218 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import "jspdf-autotable";
 
-/* =====================================================
-   EXISTING REPORT EXPORT (DO NOT CHANGE)
-===================================================== */
-export const exportFinancePDF = ({
-  clubName,
+export const exportHistoryCyclePDF = ({
+  cycle,
   summary,
-  contributions,
+  weekly,
+  puja,
+  donations,
   expenses,
 }) => {
   const doc = new jsPDF();
+  let y = 15;
 
-  // ===== HEADER =====
-  doc.setFontSize(18);
-  doc.text(clubName, 14, 20);
+  /* ================= HEADER ================= */
+  doc.setFontSize(16);
+  doc.text("Saraswati Puja Committee", 105, y, { align: "center" });
+  y += 8;
 
   doc.setFontSize(12);
-  doc.text("Financial Report", 14, 30);
+  doc.text(
+    `Financial Report – ${cycle.name}`,
+    105,
+    y,
+    { align: "center" }
+  );
+  y += 6;
 
   doc.setFontSize(10);
   doc.text(
-    `Generated on: ${new Date().toLocaleDateString()}`,
-    14,
-    38
+    `Cycle Period: ${formatDate(cycle.startDate)} → ${formatDate(
+      cycle.endDate
+    )}`,
+    105,
+    y,
+    { align: "center" }
+  );
+  y += 10;
+
+  /* ================= SUMMARY ================= */
+  doc.autoTable({
+    startY: y,
+    head: [["Opening", "Collections", "Expenses", "Closing"]],
+    body: [[
+      rupee(summary.openingBalance),
+      rupee(summary.collections),
+      rupee(summary.expenses),
+      rupee(summary.closingBalance),
+    ]],
+    theme: "grid",
+    styles: { halign: "center" },
+  });
+
+  y = doc.lastAutoTable.finalY + 8;
+
+  /* ================= WEEKLY ================= */
+  section(
+    doc,
+    "Weekly Contributions (Per Member)",
+    weekly.map(w => [w.memberName, rupee(w.total)]),
+    ["Member", "Amount"],
+    y
   );
 
-  // ===== SUMMARY TABLE =====
-  autoTable(doc, {
-    startY: 45,
-    head: [["Summary", "Amount (₹)"]],
-    body: summary.map((s) => [s.label, s.value]),
-    theme: "grid",
-  });
+  y = doc.lastAutoTable.finalY + 8;
 
-  // ===== CONTRIBUTIONS TABLE =====
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 10,
-    head: [["Type", "Amount (₹)"]],
-    body: contributions.map((c) => [c.type, c.amount]),
-    theme: "striped",
-  });
+  /* ================= PUJA ================= */
+  section(
+    doc,
+    "Puja Contributions (Per Member)",
+    puja.map(p => [p.memberName, rupee(p.total)]),
+    ["Member", "Amount"],
+    y
+  );
 
-  // ===== EXPENSES TABLE =====
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 10,
-    head: [["Title", "Amount", "Added By", "Status"]],
-    body: expenses.map((e) => [
-      e.title,
-      e.amount,
-      e.addedBy,
-      e.status,
+  y = doc.lastAutoTable.finalY + 8;
+
+  /* ================= DONATIONS ================= */
+  section(
+    doc,
+    "Outside Donations",
+    donations.map(d => [
+      d.donorName,
+      d.date,
+      rupee(d.amount),
     ]),
-    theme: "grid",
-  });
+    ["Donor", "Date", "Amount"],
+    y
+  );
 
-  doc.save("saraswati-puja-report.pdf");
+  y = doc.lastAutoTable.finalY + 8;
+
+  /* ================= EXPENSES ================= */
+  section(
+    doc,
+    "Approved Expenses",
+    expenses.map(e => [
+      e.title,
+      e.date,
+      rupee(e.amount),
+    ]),
+    ["Title", "Date", "Amount"],
+    y
+  );
+
+  doc.save(
+    `Saraswati_Puja_${cycle.name.replace(/\s+/g, "_")}.pdf`
+  );
 };
 
-/* =====================================================
-   NEW: HISTORY YEAR-WISE PDF EXPORT
-===================================================== */
-export const exportHistoryYearPDF = (year, data) => {
+export const exportFinancePDF = ({
+  summary,
+  weekly,
+  puja,
+  donations,
+  expenses,
+}) => {
   const doc = new jsPDF();
+  let y = 15;
 
-  /* ===== HEADER ===== */
-  doc.setFontSize(18);
-  doc.text("Saraswati Puja Committee", 14, 20);
+  /* ================= HEADER ================= */
+  doc.setFontSize(16);
+  doc.text("Saraswati Puja Committee - Financial Report", 105, y, { align: "center" });
+  y += 8;
 
   doc.setFontSize(12);
-  doc.text(`Financial History Report - ${year}`, 14, 30);
-
-  doc.setFontSize(10);
   doc.text(
-    `Generated on: ${new Date().toLocaleDateString()}`,
-    14,
-    38
+    "Overall Financial Summary",
+    105,
+    y,
+    { align: "center" }
   );
+  y += 10;
 
-  /* ===== SUMMARY ===== */
-  autoTable(doc, {
-    startY: 45,
-    head: [["Summary", "Amount (₹)"]],
+  /* ================= SUMMARY ================= */
+  doc.autoTable({
+    startY: y,
+    head: [["Opening Balance", "Total Collections", "Total Expenses", "Closing Balance"]],
     body: [
-      ["Opening Balance", data.openingBalance],
-      ["Total Collection", data.collections],
-      ["Total Expenses", data.expenses],
-      ["Closing Balance", data.closingBalance],
+      [
+        rupee(summary.openingBalance),
+        rupee(summary.collections),
+        rupee(summary.expenses),
+        rupee(summary.closingBalance),
+      ],
     ],
     theme: "grid",
+    styles: { halign: "center" },
   });
 
-  let nextY = doc.lastAutoTable.finalY + 10;
+  y = doc.lastAutoTable.finalY + 8;
 
-  /* ===== WEEKLY CONTRIBUTIONS ===== */
-  if (data.weekly && data.weekly.length > 0) {
-    doc.setFontSize(12);
-    doc.text("Weekly Contributions (Member-wise)", 14, nextY);
+  /* ================= WEEKLY ================= */
+  section(
+    doc,
+    "Weekly Contributions (Per Member)",
+    weekly.map((w) => [w.memberName, rupee(w.total)]),
+    ["Member", "Amount"],
+    y
+  );
 
-    autoTable(doc, {
-      startY: nextY + 5,
-      head: [["Member", "Amount (₹)"]],
-      body: data.weekly.map((w) => [
-        w.member,
-        w.amount,
-      ]),
-      theme: "striped",
-    });
+  y = doc.lastAutoTable.finalY + 8;
 
-    nextY = doc.lastAutoTable.finalY + 10;
-  }
+  /* ================= PUJA ================= */
+  section(
+    doc,
+    "Puja Contributions (Per Member)",
+    puja.map((p) => [p.memberName, rupee(p.total)]),
+    ["Member", "Amount"],
+    y
+  );
 
-  /* ===== PUJA CONTRIBUTIONS ===== */
-  if (data.puja && data.puja.length > 0) {
-    doc.setFontSize(12);
-    doc.text("Puja Time Contributions", 14, nextY);
+  y = doc.lastAutoTable.finalY + 8;
 
-    autoTable(doc, {
-      startY: nextY + 5,
-      head: [["Member", "Amount (₹)", "Date"]],
-      body: data.puja.map((p) => [
-        p.member,
-        p.amount,
-        p.date,
-      ]),
-      theme: "grid",
-    });
+  /* ================= DONATIONS ================= */
+  section(
+    doc,
+    "Outside Donations",
+    donations.map((d) => [d.donorName, d.date, rupee(d.amount)]),
+    ["Donor", "Date", "Amount"],
+    y
+  );
 
-    nextY = doc.lastAutoTable.finalY + 10;
-  }
+  y = doc.lastAutoTable.finalY + 8;
 
-  /* ===== OUTSIDE DONATIONS ===== */
-  if (data.donations && data.donations.length > 0) {
-    doc.setFontSize(12);
-    doc.text("Outside Donations", 14, nextY);
+  /* ================= EXPENSES ================= */
+  section(
+    doc,
+    "Approved Expenses",
+    expenses.map((e) => [e.title, e.date, rupee(e.amount)]),
+    ["Title", "Date", "Amount"],
+    y
+  );
 
-    autoTable(doc, {
-      startY: nextY + 5,
-      head: [["Donor", "Amount (₹)", "Date"]],
-      body: data.donations.map((d) => [
-        d.name,
-        d.amount,
-        d.date,
-      ]),
-      theme: "striped",
-    });
-
-    nextY = doc.lastAutoTable.finalY + 10;
-  }
-
-  /* ===== EXPENSES ===== */
-  if (data.expensesList && data.expensesList.length > 0) {
-    doc.setFontSize(12);
-    doc.text("Expenses", 14, nextY);
-
-    autoTable(doc, {
-      startY: nextY + 5,
-      head: [["Title", "Amount (₹)", "Date"]],
-      body: data.expensesList.map((e) => [
-        e.title,
-        e.amount,
-        e.date,
-      ]),
-      theme: "grid",
-    });
-  }
-
-  doc.save(`Saraswati_Puja_History_${year}.pdf`);
+  doc.save(`Financial-Report-Overall.pdf`);
 };
+
+const section = (doc, title, body, head, y) => {
+  doc.setFontSize(12);
+  doc.text(title, 14, y - 3);
+
+  doc.autoTable({
+    startY: y,
+    head: [head],
+    body,
+    theme: "striped",
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [79, 70, 229] },
+  });
+}
+
+function rupee(n) {
+  return `₹ ${Number(n || 0).toLocaleString("en-IN")}`;
+}
+
+function formatDate(d) {
+  return new Date(d).toISOString().slice(0, 10);
+}

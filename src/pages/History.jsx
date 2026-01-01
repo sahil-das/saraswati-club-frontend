@@ -1,136 +1,165 @@
 import { useEffect, useState } from "react";
+import axios from "../api/axios";
+import { exportHistoryCyclePDF } from "../utils/pdfExport";
 import {
-  IndianRupee,
   ChevronDown,
   ChevronUp,
   Download,
+  Lock,
+  IndianRupee,
 } from "lucide-react";
-import api from "../api/axios";
-import { exportHistoryYearPDF } from "../utils/pdfExport";
 import { useAuth } from "../context/AuthContext";
 
 export default function History() {
   const { user } = useAuth();
 
-  const [years, setYears] = useState([]);
-  const [year, setYear] = useState(null);
+  const [cycles, setCycles] = useState([]);
+  const [cycleId, setCycleId] = useState("");
   const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const [weekly, setWeekly] = useState([]);
-  const [puja, setPuja] = useState([]);
-  const [donations, setDonations] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-
-  const [open, setOpen] = useState({
+  const [sections, setSections] = useState({
     weekly: false,
     puja: false,
     donations: false,
     expenses: false,
   });
 
-  /* ================= LOAD YEARS ================= */
+  const [data, setData] = useState({
+    weekly: [],
+    puja: [],
+    donations: [],
+    expenses: [],
+  });
+
+  /* ================= LOAD CYCLES ================= */
   useEffect(() => {
-    const loadYears = async () => {
-      const res = await api.get("/cycles");
-      const yearsSet = new Set();
-
-      res.data.data.forEach((c) => {
-        yearsSet.add(new Date(c.startDate).getFullYear());
-        yearsSet.add(new Date(c.endDate).getFullYear());
-      });
-
-      const arr = [...yearsSet].sort((a, b) => b - a);
-      setYears(arr);
-      setYear(arr[0]);
-    };
-
-    loadYears();
+    axios.get("/history/cycles").then((res) => {
+      setCycles(res.data.data);
+      if (res.data.data.length) {
+        setCycleId(res.data.data[0]._id);
+      }
+    });
   }, []);
 
-  /* ================= LOAD YEAR DATA ================= */
+  /* ================= LOAD SUMMARY ================= */
   useEffect(() => {
-    if (!year) return;
+    if (!cycleId) return;
 
-    const load = async () => {
-      const [s, w, p, d, e] = await Promise.all([
-        api.get(`/history/${year}/summary`),
-        api.get(`/history/${year}/weekly`),
-        api.get(`/history/${year}/puja`),
-        api.get(`/history/${year}/donations`),
-        api.get(`/history/${year}/expenses`),
-      ]);
+    setLoading(true);
+    axios
+      .get(`/history/cycle/${cycleId}/summary`)
+      .then((res) => setSummary(res.data.data))
+      .finally(() => setLoading(false));
+  }, [cycleId]);
 
-      setSummary(s.data.data);
-      setWeekly(w.data.data);
-      setPuja(p.data.data);
-      setDonations(d.data.data);
-      setExpenses(e.data.data);
-    };
+  /* ================= LOAD SECTION ================= */
+  const loadSection = async (key) => {
+    if (sections[key]) {
+      setSections((p) => ({ ...p, [key]: false }));
+      return;
+    }
 
-    load();
-  }, [year]);
+    const res = await axios.get(
+      `/history/cycle/${cycleId}/${key}`
+    );
 
-  if (!summary) {
-    return <p className="text-gray-500">Loading history…</p>;
+    setData((p) => ({ ...p, [key]: res.data.data }));
+    setSections((p) => ({ ...p, [key]: true }));
+  };
+
+  /* ================= CLOSE CYCLE ================= */
+  const closeCycle = async () => {
+    if (!window.confirm("Close this cycle permanently?")) return;
+
+    await axios.post(`/history/cycle/${cycleId}/close`);
+    alert("Cycle closed");
+    window.location.reload();
+  };
+
+  if (loading || !summary) {
+    return <p className="text-gray-500">Loading history...</p>;
   }
 
-  /* ================= TOTALS ================= */
-  const weeklyTotal = weekly.reduce((s, r) => s + r.total, 0);
-  const pujaTotal = puja.reduce((s, r) => s + r.total, 0);
-  const donationTotal = donations.reduce((s, r) => s + r.amount, 0);
-  const expenseTotal = expenses.reduce((s, r) => s + r.amount, 0);
-
-  const toggle = (k) =>
-    setOpen((p) => ({ ...p, [k]: !p[k] }));
+  const cycle = cycles.find((c) => c._id === cycleId);
 
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold">
-            Financial History
-          </h2>
-          <p className="text-sm text-gray-500">
-            Previous year audit (read-only)
-          </p>
+      <div>
+        <h2 className="text-xl font-semibold">Financial History</h2>
+        <p className="text-sm text-gray-500">
+          Read-only records per puja cycle
+        </p>
+      </div>
+
+      {/* CYCLE SELECT */}
+      <div className="flex flex-wrap gap-4 items-end">
+        <div className="bg-white p-4 rounded-xl shadow max-w-sm">
+          <label className="text-sm font-medium">Select Cycle</label>
+          <select
+            value={cycleId}
+            onChange={(e) => setCycleId(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 mt-1"
+          >
+            {cycles.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.name} (
+                {new Date(c.startDate).getFullYear()}–
+                {new Date(c.endDate).getFullYear()})
+              </option>
+            ))}
+          </select>
         </div>
 
         <button
           onClick={() =>
-            exportHistoryYearPDF(year, {
+            exportHistoryCyclePDF({
+              cycle,
               summary,
-              weekly,
-              puja,
-              donations,
-              expenses,
+              weekly: data.weekly,
+              puja: data.puja,
+              donations: data.donations,
+              expenses: data.expenses,
             })
           }
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg"
+          className="btn-primary flex gap-2"
         >
           <Download size={16} />
           Export PDF
         </button>
+
+
+        {summary.isClosed && (
+          <span className="text-green-600 font-medium flex items-center gap-1">
+            <Lock size={16} /> Closed
+          </span>
+        )}
+
+        {user.role === "admin" && !summary.isClosed && (
+          <button
+            onClick={closeCycle}
+            className="btn-danger"
+          >
+            Close Cycle
+          </button>
+        )}
       </div>
 
-      {/* YEAR SELECT */}
-      <select
-        value={year}
-        onChange={(e) => setYear(Number(e.target.value))}
-        className="border rounded-lg px-3 py-2"
-      >
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
-
-      {/* SUMMARY */}
+      {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <SummaryCard label="Opening Balance" value={summary.openingBalance} />
-        <SummaryCard label="Total Collection" value={summary.collections} />
-        <SummaryCard label="Expenses" value={summary.expenses} />
+        <SummaryCard
+          label="Opening Balance"
+          value={summary.openingBalance}
+        />
+        <SummaryCard
+          label="Total Collection"
+          value={summary.collections}
+        />
+        <SummaryCard
+          label="Total Expenses"
+          value={summary.expenses}
+        />
         <SummaryCard
           label="Closing Balance"
           value={summary.closingBalance}
@@ -138,71 +167,63 @@ export default function History() {
         />
       </div>
 
-      {/* WEEKLY */}
-      <Collapsible
-        title="Weekly Contributions"
-        total={weeklyTotal}
-        open={open.weekly}
-        toggle={() => toggle("weekly")}
+      {/* COLLAPSIBLES */}
+      <Section
+        title={`Weekly Contributions (₹${summary.weeklyTotal || 0})`}
+        open={sections.weekly}
+        onToggle={() => loadSection("weekly")}
       >
-        <Table
-          columns={["Member", "Total"]}
-          rows={weekly.map((r) => [
-            r.memberName,
-            `₹ ${r.total}`,
-          ])}
-        />
-      </Collapsible>
+        {data.weekly.map((r) => (
+          <Row
+            key={r._id}
+            label={r.memberName}
+            value={r.total}
+          />
+        ))}
+      </Section>
 
-      {/* PUJA */}
-      <Collapsible
-        title="Puja Contributions"
-        total={pujaTotal}
-        open={open.puja}
-        toggle={() => toggle("puja")}
+      <Section
+        title={`Puja Contributions (₹${summary.pujaTotal || 0})`}
+        open={sections.puja}
+        onToggle={() => loadSection("puja")}
       >
-        <Table
-          columns={["Member", "Total"]}
-          rows={puja.map((r) => [
-            r.memberName,
-            `₹ ${r.total}`,
-          ])}
-        />
-      </Collapsible>
+        {data.puja.map((r) => (
+          <Row
+            key={r._id}
+            label={r.memberName}
+            value={r.total}
+          />
+        ))}
+      </Section>
 
-      {/* DONATIONS */}
-      <Collapsible
-        title="Outside Donations"
-        total={donationTotal}
-        open={open.donations}
-        toggle={() => toggle("donations")}
+      <Section
+        title={`Donations (₹${summary.donationTotal || 0})`}
+        open={sections.donations}
+        onToggle={() => loadSection("donations")}
       >
-        <Table
-          columns={["Donor", "Amount", "Date"]}
-          rows={donations.map((r) => [
-            r.donorName,
-            `₹ ${r.amount}`,
-            r.date,
-          ])}
-        />
-      </Collapsible>
+        {data.donations.map((r, i) => (
+          <Row
+            key={i}
+            label={`${r.donorName} (${r.date})`}
+            value={r.amount}
+          />
+        ))}
+      </Section>
 
-      {/* EXPENSES */}
-      <Collapsible
-        title="Expenses"
-        total={expenseTotal}
-        open={open.expenses}
-        toggle={() => toggle("expenses")}
+      <Section
+        title={`Expenses (₹${summary.expenses || 0})`}
+        open={sections.expenses}
+        onToggle={() => loadSection("expenses")}
       >
-        <Table
-          columns={["Title", "Amount", "Date"]}
-          rows={expenses.map((r) => [
-            r.title,
-            `₹ ${r.amount}`,
-            r.date,
-          ])}
-        />
-      </Collapsible>
+        {data.expenses.map((r, i) => (
+          <Row
+            key={i}
+            label={`${r.title} (${r.date})`}
+            value={r.amount}
+            negative
+          />
+        ))}
+      </Section>
     </div>
   );
 }
@@ -212,7 +233,7 @@ export default function History() {
 function SummaryCard({ label, value, highlight }) {
   return (
     <div
-      className={`rounded-xl shadow p-5 flex gap-4 ${
+      className={`rounded-xl shadow p-5 flex items-center gap-4 ${
         highlight ? "bg-indigo-600 text-white" : "bg-white"
       }`}
     >
@@ -227,50 +248,41 @@ function SummaryCard({ label, value, highlight }) {
   );
 }
 
-function Collapsible({ title, total, open, toggle, children }) {
+function Section({ title, open, onToggle, children }) {
   return (
     <div className="bg-white rounded-xl shadow">
       <button
-        onClick={toggle}
+        onClick={onToggle}
         className="w-full flex justify-between items-center p-4 font-semibold"
       >
-        <span>{title}</span>
-        <span className="flex items-center gap-3">
-          <span className="text-green-600">₹ {total}</span>
-          {open ? <ChevronUp /> : <ChevronDown />}
-        </span>
+        {title}
+        {open ? <ChevronUp /> : <ChevronDown />}
       </button>
 
-      {open && <div className="border-t p-4">{children}</div>}
+      {open && (
+        <div className="border-t p-4 space-y-2">
+          {children.length ? children : (
+            <p className="text-sm text-gray-500">
+              No records
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function Table({ columns, rows }) {
+function Row({ label, value, negative }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-100">
-          <tr>
-            {columns.map((c) => (
-              <th key={c} className="p-2 text-left">
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t">
-              {r.map((v, j) => (
-                <td key={j} className="p-2">
-                  {v}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex justify-between text-sm">
+      <span>{label}</span>
+      <span
+        className={`font-semibold ${
+          negative ? "text-red-600" : "text-green-600"
+        }`}
+      >
+        ₹ {value}
+      </span>
     </div>
   );
 }

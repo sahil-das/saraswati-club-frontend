@@ -22,10 +22,10 @@ export const FinanceProvider = ({ children }) => {
         donationRes,
         expenseRes,
       ] = await Promise.all([
-        api.get("/reports/weekly-total"),
-        api.get("/reports/puja-total"),        // ✅ ADD THIS
-        api.get("/reports/donations-total"),
-        api.get("/reports/expenses-total"),
+        api.get("/finance/weekly-total"),
+        api.get("/finance/puja-total"),        // ✅ ADD THIS
+        api.get("/finance/donations-total"),
+        api.get("/finance/expenses-total"),
       ]);
 
       setWeeklyTotal(weeklyRes.data.total || 0);
