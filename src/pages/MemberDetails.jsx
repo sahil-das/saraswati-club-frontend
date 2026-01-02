@@ -131,8 +131,8 @@ export default function MemberDetails() {
         <div className="bg-indigo-50 p-4 rounded-lg text-sm">
           <p className="font-medium">Active Cycle: {cycle.name}</p>
           <p>
-            {cycle.startDate.slice(0, 10)} →{" "}
-            {cycle.endDate.slice(0, 10)}
+            {cycle.startDate ? cycle.startDate.slice(0, 10) : "—"} →{" "}
+            {cycle.endDate ? cycle.endDate.slice(0, 10) : "—"}
           </p>
         </div>
       )}
