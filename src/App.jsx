@@ -8,23 +8,19 @@ import { FinanceProvider } from "./context/FinanceContext";
 // Components
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// Pages - Auth & Core
+// Pages
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard"; // Ensure this uses <Outlet /> now
+import Dashboard from "./pages/Dashboard"; 
 import DashboardHome from "./pages/DashboardHome";
 import UserProfile from "./pages/UserProfile";
 import Settings from "./pages/Settings";
 import History from "./pages/History";
-
-// Pages - Financials
 import CollectionsOverview from "./pages/CollectionsOverview";
 import Contributions from "./pages/Contributions";
 import WeeklyContributions from "./pages/WeeklyContributions";
 import PujaContributions from "./pages/PujaContributions";
 import Donations from "./pages/Donations";
 import Expenses from "./pages/Expenses";
-
-// Pages - Admin/Members
 import Members from "./pages/Members";
 import MemberDetails from "./pages/MemberDetails";
 import Reports from "./pages/Reports";
@@ -38,17 +34,16 @@ export default function App() {
             {/* --- Public Routes --- */}
             <Route path="/login" element={<Login />} />
 
-            {/* --- Main Dashboard Layout --- */}
-            {/* The parent route handles the Layout and Basic Auth */}
+            {/* --- Main Layout (Root "/" instead of "/dashboard") --- */}
             <Route
-              path="/dashboard"
+              path="/"
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
               }
             >
-              {/* Index matches "/dashboard" exactly */}
+              {/* Home Page (formerly /dashboard) */}
               <Route index element={<DashboardHome />} />
               
               <Route path="profile" element={<UserProfile />} />
@@ -63,7 +58,6 @@ export default function App() {
               <Route path="expenses" element={<Expenses />} />
 
               {/* --- Admin Only Routes --- */}
-              {/* These are nested, but we wrap the element to enforce Role checks */}
               <Route 
                 path="members" 
                 element={

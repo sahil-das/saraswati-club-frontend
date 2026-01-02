@@ -32,7 +32,7 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-8">
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
@@ -53,26 +53,23 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* ================= KPI CARDS ================= */}
+      {/* KPI CARDS (UPDATED LINKS) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* ✅ CHANGED: Points to /dashboard/reports (Income vs Expense) */}
         <StatCard
           title="Central Balance"
           value={centralFund}
           icon={<Wallet />}
           color="bg-green-600"
-          to="/dashboard/reports" 
+          to="/reports" 
           subtitle={`Includes ₹${openingBalance} opening`} 
         />
 
-        {/* Points to /dashboard/collections (Income Breakdown) */}
         <StatCard
           title="Total Collection"
           value={totalCollection}
           icon={<IndianRupee />}
           color="bg-indigo-600"
-          to="/dashboard/collections"
+          to="/collections" 
           subtitle="This year's revenue"
         />
 
@@ -81,7 +78,7 @@ export default function DashboardHome() {
           value={approvedExpenses}
           icon={<FileText />}
           color="bg-red-500"
-          to="/dashboard/expenses"
+          to="/expenses" 
           subtitle="View details"
         />
 
@@ -90,12 +87,12 @@ export default function DashboardHome() {
           value={donationTotal}
           icon={<TrendingUp />}
           color="bg-yellow-500"
-          to="/dashboard/donations"
+          to="/donations" 
           subtitle="Member & outside"
         />
       </div>
 
-      {/* ================= QUICK ACTIONS ================= */}
+      {/* QUICK ACTIONS (UPDATED LINKS) */}
       {user.role === "admin" && (
         <div className="bg-white rounded-xl shadow p-6">
           <h3 className="font-semibold mb-4">
@@ -106,40 +103,40 @@ export default function DashboardHome() {
             <QuickAction
               label="Add Weekly"
               icon={<PlusCircle />}
-              to="/dashboard/weekly"
+              to="/weekly" 
             />
 
             <QuickAction
               label="Puja Contribution"
               icon={<Users />}
-              to="/dashboard/puja-contributions"
+              to="/puja-contributions" 
             />
 
             <QuickAction
               label="Add Donation"
               icon={<TrendingUp />}
-              to="/dashboard/donations"
+              to="/donations" 
             />
 
             <QuickAction
               label="Add Expense"
               icon={<FileText />}
-              to="/dashboard/expenses"
+              to="/expenses" 
             />
 
             <QuickAction
               label="Collections"
               icon={<BarChart3 />}
-              to="/dashboard/collections"
+              to="/collections" 
             />
           </div>
         </div>
       )}
 
-      {/* ================= REPORTS SHORTCUT ================= */}
+      {/* REPORTS SHORTCUT (UPDATED LINK) */}
       {user.role === "admin" && (
         <Link
-          to="/dashboard/reports"
+          to="/reports" 
           className="bg-white rounded-xl shadow p-6 flex items-center gap-4
                      hover:bg-indigo-50 transition"
         >
@@ -160,40 +157,20 @@ export default function DashboardHome() {
   );
 }
 
-/* ================= COMPONENTS ================= */
+/* ================= COMPONENTS (Unchanged) ================= */
 
-function StatCard({
-  title,
-  value,
-  icon,
-  color,
-  to,
-  subtitle,
-}) {
+function StatCard({ title, value, icon, color, to, subtitle }) {
   return (
     <Link
       to={to}
       className="bg-white rounded-xl shadow p-5 flex items-center gap-4
                  hover:shadow-lg hover:scale-[1.02] transition cursor-pointer"
     >
-      <div
-        className={`${color} text-white p-3 rounded-lg`}
-      >
-        {icon}
-      </div>
-
+      <div className={`${color} text-white p-3 rounded-lg`}>{icon}</div>
       <div>
-        <p className="text-sm text-gray-500">
-          {title}
-        </p>
-        <h3 className="text-xl font-bold">
-          ₹ {value}
-        </h3>
-        {subtitle && (
-          <p className="text-xs text-gray-400 mt-1">
-            {subtitle}
-          </p>
-        )}
+        <p className="text-sm text-gray-500">{title}</p>
+        <h3 className="text-xl font-bold">₹ {value}</h3>
+        {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
       </div>
     </Link>
   );
@@ -207,12 +184,8 @@ function QuickAction({ label, icon, to }) {
                  border rounded-lg p-4 hover:bg-indigo-50 transition
                  text-gray-700 hover:text-indigo-600"
     >
-      <div className="text-indigo-600">
-        {icon}
-      </div>
-      <span className="text-sm font-medium text-center">
-        {label}
-      </span>
+      <div className="text-indigo-600">{icon}</div>
+      <span className="text-sm font-medium text-center">{label}</span>
     </Link>
   );
 }

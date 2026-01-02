@@ -3,19 +3,19 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Navigate } from "react-router-dom";
 
 export default function Login() {
-  const { user, login } = useAuth(); // ✅ single call
+  const { user, login } = useAuth(); 
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
 
-  // 🔒 If already logged in, redirect
+  // 🔒 If already logged in, redirect to HOME (/) instead of /dashboard
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />; // ✅ CHANGED
   }
 
   const onSubmit = async (data) => {
     try {
       await login(data.email, data.password);
-      navigate("/dashboard");
+      navigate("/"); // ✅ CHANGED
     } catch (err) {
       console.error(err);
       alert("Invalid login credentials");

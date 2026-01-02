@@ -10,7 +10,6 @@ export default function Navbar({ setOpen }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -26,30 +25,28 @@ export default function Navbar({ setOpen }) {
     navigate("/login");
   };
 
-  /* ===== PAGE TITLE LOGIC ===== */
+  /* ===== UPDATED PAGE TITLE LOGIC ===== */
   const getTitle = () => {
     const path = location.pathname;
     
-    if (path === "/dashboard" || path === "/dashboard/") return "Dashboard";
+    if (path === "/") return "Dashboard"; // Root is now Dashboard
     if (path.includes("/profile")) return "My Profile";
     if (path.includes("/weekly")) return "Weekly Contributions";
     if (path.includes("/donations")) return "Donations";
     if (path.includes("/expenses")) return "Expenses";
     if (path.includes("/members")) return "Members";
-    if (path.includes("/history")) return "Financial History";
+    if (path.includes("/history")) return "History";
     if (path.includes("/settings")) return "Settings";
     if (path.includes("/puja-contributions")) return "Puja Contributions";
     if (path.includes("/collections")) return "Collections Overview";
-    if (path.includes("/contributions")) return "Contributions";
     if (path.includes("/reports")) return "Reports";
-    if (path.includes("/member/")) return "Member Details";
+    
     return "Dashboard";
   };
 
   return (
     <header className="h-16 bg-white border-b flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
       
-      {/* LEFT: Mobile Menu + Title */}
       <div className="flex items-center gap-3">
         <button className="md:hidden text-gray-600" onClick={() => setOpen(true)}>
           <Menu size={24} />
@@ -57,7 +54,6 @@ export default function Navbar({ setOpen }) {
         <h1 className="font-bold text-gray-800 text-lg">{getTitle()}</h1>
       </div>
 
-      {/* RIGHT: Profile Dropdown */}
       <div className="relative" ref={dropdownRef}>
         <button 
           onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -77,7 +73,6 @@ export default function Navbar({ setOpen }) {
           <ChevronDown size={16} className={`text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
         </button>
 
-        {/* DROPDOWN MENU */}
         {dropdownOpen && (
           <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 animation-fade-in-up">
             <div className="px-4 py-2 border-b border-gray-100 sm:hidden">
@@ -85,8 +80,9 @@ export default function Navbar({ setOpen }) {
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
             
+            {/* UPDATED LINK */}
             <Link 
-              to="/dashboard/profile" 
+              to="/profile" 
               onClick={() => setDropdownOpen(false)}
               className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
@@ -94,8 +90,9 @@ export default function Navbar({ setOpen }) {
             </Link>
             
             {user?.role === 'admin' && (
+              // UPDATED LINK
               <Link 
-                to="/dashboard/settings" 
+                to="/settings" 
                 onClick={() => setDropdownOpen(false)}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
