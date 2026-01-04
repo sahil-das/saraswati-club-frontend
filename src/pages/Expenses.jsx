@@ -3,9 +3,9 @@ import { useForm } from "react-hook-form";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { 
-  Plus, Search, CheckCircle, XCircle, Clock, Loader2, IndianRupee, AlertCircle, Lock, Download 
-} from "lucide-react";
-import { exportExpensesPDF } from "../utils/pdfExport"; // ✅ Import
+  Plus, Search, CheckCircle, XCircle, Clock, Loader2, IndianRupee, AlertCircle, Lock, Download, Trash2 
+} from "lucide-react"; // ✅ Imported Trash2
+import { exportExpensesPDF } from "../utils/pdfExport"; 
 
 export default function Expenses() {
   const { activeClub } = useAuth(); 
@@ -51,6 +51,19 @@ export default function Expenses() {
     }
   };
 
+  // ✅ NEW: Delete Handler
+  const handleDelete = async (id) => {
+    if (activeClub?.role !== "admin") return alert("Only Admins can delete expenses.");
+    if (!window.confirm("Are you sure you want to permanently delete this expense? This will be logged.")) return;
+
+    try {
+      await api.delete(`/expenses/${id}`);
+      setExpenses(prev => prev.filter(e => e._id !== id));
+    } catch (err) {
+      alert("Failed to delete: " + (err.response?.data?.message || "Server Error"));
+    }
+  };
+
   const totalApproved = expenses
     .filter(e => e.status === "approved")
     .reduce((sum, e) => sum + e.amount, 0);
@@ -59,12 +72,11 @@ export default function Expenses() {
     e.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ✅ HANDLER: Export PDF
   const handleExport = () => {
     exportExpensesPDF({ 
       clubName: activeClub?.clubName || activeClub?.name || "Club Committee",
       cycleName: cycle?.name, 
-      expenses: filteredExpenses // Exports filtered list
+      expenses: filteredExpenses 
     });
   };
 
@@ -126,7 +138,6 @@ export default function Expenses() {
           />
         </div>
         
-        {/* ✅ EXPORT BUTTON */}
         <button 
           onClick={handleExport}
           className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl font-bold hover:bg-gray-50 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
@@ -169,8 +180,19 @@ export default function Expenses() {
 
             <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
                <span className="text-xs text-gray-400">
-                  By: <span className="font-medium text-gray-600">{e.recordedBy?.name || "Member"}</span>
+                 By: <span className="font-medium text-gray-600">{e.recordedBy?.name || "Member"}</span>
                </span>
+
+               {/* ✅ DELETE ICON (Admins Only) */}
+               {activeClub?.role === "admin" && (
+                 <button 
+                   onClick={() => handleDelete(e._id)} 
+                   className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                   title="Delete Expense"
+                 >
+                   <Trash2 size={16} />
+                 </button>
+               )}
             </div>
 
             {/* ADMIN ACTIONS */}
@@ -235,45 +257,45 @@ function AddExpenseModal({ categories, onClose, refresh }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-             <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
-                 <div className="bg-rose-600 p-4 text-white">
-                    <h2 className="text-lg font-bold">Add New Expense</h2>
-                    <p className="text-rose-100 text-xs">Record a bill or payment</p>
-                 </div>
-                 
-                 <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-                     <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase">Title</label>
-                        <input {...register("title", { required: true })} placeholder="e.g. Electric Bill" className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1" />
-                     </div>
-                     
-                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Amount</label>
-                            <input {...register("amount", { required: true })} type="number" placeholder="0" className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
-                            <select {...register("category", { required: true })} className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1">
-                                <option value="">Select...</option>
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                     </div>
+              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="bg-rose-600 p-4 text-white">
+                     <h2 className="text-lg font-bold">Add New Expense</h2>
+                     <p className="text-rose-100 text-xs">Record a bill or payment</p>
+                  </div>
+                  
+                  <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+                      <div>
+                         <label className="text-xs font-bold text-gray-500 uppercase">Title</label>
+                         <input {...register("title", { required: true })} placeholder="e.g. Electric Bill" className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1" />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                         <div>
+                             <label className="text-xs font-bold text-gray-500 uppercase">Amount</label>
+                             <input {...register("amount", { required: true })} type="number" placeholder="0" className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1" />
+                         </div>
+                         <div>
+                             <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
+                             <select {...register("category", { required: true })} className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1">
+                                 <option value="">Select...</option>
+                                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                             </select>
+                         </div>
+                      </div>
 
-                     <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase">Description (Optional)</label>
-                        <textarea {...register("description")} rows="2" className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1"></textarea>
-                     </div>
+                      <div>
+                         <label className="text-xs font-bold text-gray-500 uppercase">Description (Optional)</label>
+                         <textarea {...register("description")} rows="2" className="w-full border p-2.5 rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-rose-500 mt-1"></textarea>
+                      </div>
 
-                     <div className="flex gap-3 mt-4">
-                         <button type="button" onClick={onClose} className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-                         <button type="submit" disabled={submitting} className="flex-1 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 shadow-lg shadow-rose-200 transition-colors flex justify-center items-center gap-2">
+                      <div className="flex gap-3 mt-4">
+                          <button type="button" onClick={onClose} className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
+                          <button type="submit" disabled={submitting} className="flex-1 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 shadow-lg shadow-rose-200 transition-colors flex justify-center items-center gap-2">
                              {submitting ? <Loader2 className="animate-spin" size={18} /> : "Submit Bill"}
-                         </button>
-                     </div>
-                 </form>
-             </div>
+                          </button>
+                      </div>
+                  </form>
+              </div>
         </div>
     )
 }

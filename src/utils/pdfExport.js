@@ -9,54 +9,6 @@ function formatCurrency(n) {
   return `Rs. ${Number(n || 0).toLocaleString("en-IN")}`;
 }
 
-
-/* =========================================================
-   6. MEMBERS LIST EXPORT (Contact Directory)
-   ========================================================= */
-export const exportMembersPDF = ({ clubName, members }) => {
-  const doc = new jsPDF();
-
-  // --- HEADER ---
-  doc.setFillColor(79, 70, 229); // Indigo
-  doc.rect(0, 0, 210, 40, "F"); 
-
-  doc.setFontSize(22);
-  doc.setTextColor(255, 255, 255);
-  doc.text(clubName || "Club Committee", 105, 18, { align: "center" });
-
-  doc.setFontSize(14);
-  doc.setTextColor(224, 231, 255);
-  doc.text("Member Directory", 105, 28, { align: "center" });
-
-  // --- INFO ROW ---
-  doc.setTextColor(0);
-  doc.setFontSize(10);
-  doc.text(`Total Members: ${members.length}`, 14, 50);
-  doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 195, 50, { align: "right" });
-
-  // --- TABLE ---
-  autoTable(doc, {
-    startY: 55,
-    head: [["#", "Name", "Role", "Phone", "Email", "Joined"]],
-    body: members.map((m, index) => [
-      index + 1,
-      m.name,
-      m.role.toUpperCase(),
-      m.phone || "-",
-      m.email,
-      new Date(m.joinedAt).toLocaleDateString()
-    ]),
-    theme: "striped",
-    headStyles: { fillColor: [79, 70, 229] }, // Indigo Header
-    columnStyles: { 
-      0: { halign: "center", fontStyle: "bold", cellWidth: 10 },
-      2: { fontStyle: "bold", fontSize: 8 },
-    },
-  });
-  const clubSlug = sanitizeName(clubName || "club");
-  doc.save(`${clubSlug}_Members_List.pdf`);
-};
-
 /* =========================================================
    1. HISTORY EXPORT (Detailed - For History Page)
    Expects full lists: weekly[], puja[], donations[], expenses[]
@@ -408,4 +360,130 @@ export const exportPujaPDF = ({ clubName, cycleName, data }) => {
   const cycleSlug = sanitizeName(cycleName || "report");
   const dateSlug = new Date().toISOString().slice(0, 10);
   doc.save(`${clubSlug}_Puja_Chanda_${cycleSlug}_${dateSlug}.pdf`);
+};
+
+
+/* =========================================================
+   6. MEMBERS LIST EXPORT (Contact Directory)
+   ========================================================= */
+export const exportMembersPDF = ({ clubName, members }) => {
+  const doc = new jsPDF();
+
+  // --- HEADER ---
+  doc.setFillColor(79, 70, 229); // Indigo
+  doc.rect(0, 0, 210, 40, "F"); 
+
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
+  doc.text(clubName || "Club Committee", 105, 18, { align: "center" });
+
+  doc.setFontSize(14);
+  doc.setTextColor(224, 231, 255);
+  doc.text("Member Directory", 105, 28, { align: "center" });
+
+  // --- INFO ROW ---
+  doc.setTextColor(0);
+  doc.setFontSize(10);
+  doc.text(`Total Members: ${members.length}`, 14, 50);
+  doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 195, 50, { align: "right" });
+
+  // --- TABLE ---
+  autoTable(doc, {
+    startY: 55,
+    head: [["#", "Name", "Role", "Phone", "Email", "Joined"]],
+    body: members.map((m, index) => [
+      index + 1,
+      m.name,
+      m.role.toUpperCase(),
+      m.phone || "-",
+      m.email,
+      new Date(m.joinedAt).toLocaleDateString()
+    ]),
+    theme: "striped",
+    headStyles: { fillColor: [79, 70, 229] }, // Indigo Header
+    columnStyles: { 
+      0: { halign: "center", fontStyle: "bold", cellWidth: 10 },
+      2: { fontStyle: "bold", fontSize: 8 },
+    },
+  });
+  const clubSlug = sanitizeName(clubName || "club");
+  doc.save(`${clubSlug}_Members_List.pdf`);
+};
+
+/* =========================================================
+   7. AUDIT LOGS EXPORT
+   ========================================================= */
+export const exportAuditLogsPDF = ({ clubName, logs, period }) => {
+  const doc = new jsPDF();
+
+  // --- HEADER BANNER ---
+  doc.setFillColor(71, 85, 105); // Slate-700 (Professional Gray)
+  doc.rect(0, 0, 210, 40, "F");
+
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
+  doc.text(clubName || "Club Committee", 105, 18, { align: "center" });
+
+  doc.setFontSize(14);
+  doc.setTextColor(226, 232, 240); // Slate-200
+  doc.text("Audit Logs Report", 105, 28, { align: "center" });
+
+  // --- INFO ROW ---
+  doc.setTextColor(0);
+  doc.setFontSize(10);
+  if (period) {
+      doc.text(`Period: ${period}`, 14, 50);
+  }
+  doc.text(`Generated On: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, period ? 55 : 50);
+
+  // Total Badge
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.text(`Total Records: ${logs.length}`, 195, 50, { align: "right" });
+
+  // --- TABLE ---
+  autoTable(doc, {
+    startY: 60,
+    head: [["Date", "Time", "Actor", "Action", "Target", "Details"]],
+    body: logs.map((log) => {
+        // Format Details Object to String
+        let detailsStr = "-";
+        if (log.details) {
+             // Filter out internal IDs to keep it clean
+             detailsStr = Object.entries(log.details)
+                .filter(([k]) => !['_id', 'club', 'userId', 'memberId', 'expenseId'].includes(k))
+                .map(([k, v]) => {
+                    // Capitalize Key
+                    const label = k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                    return `${label}: ${v}`;
+                })
+                .join('\n'); // New line for better readability in PDF cell
+        }
+
+        return [
+          new Date(log.createdAt).toLocaleDateString(),
+          new Date(log.createdAt).toLocaleTimeString(),
+          log.actor?.name || "System",
+          log.action?.replace(/_/g, ' ') || "-",
+          log.target || "-",
+          detailsStr
+        ];
+    }),
+    theme: "grid",
+    headStyles: { fillColor: [71, 85, 105], textColor: 255 }, // Slate Header
+    alternateRowStyles: { fillColor: [241, 245, 249] }, // Slate-50 Rows
+    styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+    columnStyles: {
+        0: { cellWidth: 22 }, // Date
+        1: { cellWidth: 20 }, // Time
+        2: { cellWidth: 25, fontStyle: "bold" }, // Actor
+        3: { cellWidth: 35, fontSize: 8 }, // Action
+        4: { cellWidth: 35 }, // Target
+        5: { fontSize: 8 } // Details (Auto width)
+    }
+  });
+
+  const clubSlug = sanitizeName(clubName || "club");
+  const dateSlug = new Date().toISOString().slice(0, 10);
+  doc.save(`${clubSlug}_AuditLogs_${dateSlug}.pdf`);
 };
