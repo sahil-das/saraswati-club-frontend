@@ -3,11 +3,12 @@ import { useForm } from "react-hook-form";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { 
-  Plus, Search, CheckCircle, XCircle, Clock, Loader2, IndianRupee, AlertCircle, Lock 
+  Plus, Search, CheckCircle, XCircle, Clock, Loader2, IndianRupee, AlertCircle, Lock, Download 
 } from "lucide-react";
+import { exportExpensesPDF } from "../utils/pdfExport"; // ✅ Import
 
 export default function Expenses() {
-  const { activeClub } = useAuth(); // ✅ Get the active club to check role
+  const { activeClub } = useAuth(); 
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -18,7 +19,6 @@ export default function Expenses() {
 
   const fetchExpenses = async () => {
     try {
-      // Check if active year exists
       const yearRes = await api.get("/years/active");
       const activeYear = yearRes.data.data;
       
@@ -28,7 +28,6 @@ export default function Expenses() {
       }
 
       setCycle(activeYear);
-
       const res = await api.get("/expenses");
       setExpenses(res.data.data);
     } catch (err) {
@@ -40,15 +39,12 @@ export default function Expenses() {
 
   useEffect(() => {
     fetchExpenses();
-  }, [activeClub]); // Reload if club changes
+  }, [activeClub]);
 
-  // Status Handler (Approve/Reject)
   const handleStatus = async (id, newStatus) => {
     if (activeClub?.role !== "admin") return alert("Admins Only");
-
     try {
       await api.put(`/expenses/${id}/status`, { status: newStatus });
-      // Optimistic Update
       setExpenses(prev => prev.map(e => e._id === id ? { ...e, status: newStatus } : e));
     } catch (err) {
       alert("Action failed: " + (err.response?.data?.message || "Server Error"));
@@ -63,6 +59,15 @@ export default function Expenses() {
     e.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // ✅ HANDLER: Export PDF
+  const handleExport = () => {
+    exportExpensesPDF({ 
+      clubName: activeClub?.clubName || activeClub?.name || "Club Committee",
+      cycleName: cycle?.name, 
+      expenses: filteredExpenses // Exports filtered list
+    });
+  };
+
   if (loading) return (
     <div className="flex justify-center items-center h-64 text-indigo-600">
       <Loader2 className="animate-spin w-10 h-10" />
@@ -70,7 +75,6 @@ export default function Expenses() {
   );
 
   if (!cycle) {
-    // Admin view - Show alert to create year
     if (activeClub?.role === "admin") {
       return (
         <div className="p-8 text-center bg-red-50 text-red-600 rounded-xl border border-red-100 mt-6">
@@ -80,8 +84,6 @@ export default function Expenses() {
         </div>
       );
     }
-
-    // Member view - Show locked message
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
         <div className="bg-gray-100 p-6 rounded-full mb-4">
@@ -124,7 +126,15 @@ export default function Expenses() {
           />
         </div>
         
-        {/* ADD BUTTON (Visible to ALL members) */}
+        {/* ✅ EXPORT BUTTON */}
+        <button 
+          onClick={handleExport}
+          className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl font-bold hover:bg-gray-50 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
+          title="Download Expense Report"
+        >
+          <Download size={20} /> <span className="hidden sm:inline">Export</span>
+        </button>
+
         <button 
           onClick={() => setShowAddModal(true)}
           className="bg-rose-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-rose-700 flex items-center gap-2 shadow-lg shadow-rose-200 active:scale-95 transition-all"
@@ -163,7 +173,7 @@ export default function Expenses() {
                </span>
             </div>
 
-            {/* 🔒 ADMIN ACTIONS: Only show if Admin & Status is Pending */}
+            {/* ADMIN ACTIONS */}
             {activeClub?.role === "admin" && e.status === "pending" && (
               <div className="flex gap-2 mt-3 animate-in fade-in slide-in-from-top-2">
                 <button 
@@ -201,9 +211,7 @@ export default function Expenses() {
   );
 }
 
-// ---------------------------------------------
-// SUB-COMPONENT: Add Expense Modal
-// ---------------------------------------------
+// ... AddExpenseModal (No changes needed) ...
 function AddExpenseModal({ categories, onClose, refresh }) {
     const { register, handleSubmit } = useForm();
     const [submitting, setSubmitting] = useState(false);
@@ -211,8 +219,6 @@ function AddExpenseModal({ categories, onClose, refresh }) {
     const onSubmit = async (data) => {
         setSubmitting(true);
         try {
-            // Note: If Admin adds this, backend will auto-approve it.
-            // If Member adds it, it goes to 'pending'.
             await api.post("/expenses", { 
               ...data, 
               amount: Number(data.amount),
@@ -221,7 +227,7 @@ function AddExpenseModal({ categories, onClose, refresh }) {
             refresh();
             onClose();
         } catch(err) {
-            alert(err.response?.data?.message || "Failed to add expense. Ensure a Festival Year is active.");
+            alert(err.response?.data?.message || "Failed to add expense.");
         } finally {
             setSubmitting(false);
         }

@@ -1,37 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import api from "../api/axios";
 import { Loader2, Calendar, Coins, Settings, X } from "lucide-react";
 
 export default function CreateYearModal({ onSuccess, onClose }) {
-  const { register, handleSubmit, watch } = useForm({
+  const { register, handleSubmit, watch, setValue } = useForm({
     defaultValues: {
       frequency: "weekly",
       totalInstallments: 52,
       amountPerInstallment: 0,
-      openingBalance: "" // Default is empty string
+      openingBalance: "" 
     }
   });
   
   const [loading, setLoading] = useState(false);
   const frequency = watch("frequency");
 
+  // ✅ Auto-set installments when frequency changes
+  useEffect(() => {
+    if (frequency === "monthly") {
+      setValue("totalInstallments", 12);
+    } else if (frequency === "weekly") {
+      setValue("totalInstallments", 52); // Default to 52 for weekly
+    } else {
+      setValue("totalInstallments", 0);
+    }
+  }, [frequency, setValue]);
+
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      // ✅ FIX: Don't convert "" to 0. Check if it has a value first.
       const balanceToSend = data.openingBalance === "" ? "" : Number(data.openingBalance);
 
       await api.post("/years", {
         name: data.name,
         startDate: data.startDate,
         endDate: data.endDate,
-        
-        openingBalance: balanceToSend, // Sends "" if empty, or the number if typed
-
-        // Flexible Rules
+        openingBalance: balanceToSend,
         subscriptionFrequency: data.frequency,
-        totalInstallments: Number(data.totalInstallments),
+        
+        // ✅ Send 12 if monthly, otherwise use the input value
+        totalInstallments: data.frequency === 'monthly' ? 12 : Number(data.totalInstallments),
+        
         amountPerInstallment: Number(data.amountPerInstallment)
       });
       
@@ -85,45 +95,61 @@ export default function CreateYearModal({ onSuccess, onClose }) {
             </div>
           </div>
 
-          {/* 2. FLEXIBLE Rules Section */}
+          {/* 2. RULES SECTION */}
           <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
              <h3 className="text-sm font-bold text-indigo-700 mb-3 flex items-center gap-2">
-               <Settings size={16}/> Collection Type
+               <Settings size={16}/> Collection Rules
              </h3>
              
              <div className="space-y-4">
+               {/* Frequency Selector */}
                <div>
                   <label className="block text-xs text-gray-600 mb-1">Frequency</label>
-                  <select {...register("frequency")} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                  <select {...register("frequency")} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500">
                     <option value="weekly">Weekly Subscription</option>
                     <option value="monthly">Monthly Subscription</option>
                     <option value="none">No Recurring (Donations Only)</option>
                   </select>
                </div>
                
+               {/* Conditional Inputs */}
                {frequency !== "none" && (
                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-2 fade-in">
-                    <div>
-                       <label className="block text-xs text-gray-600 mb-1">
-                         Total {frequency === "weekly" ? "Weeks" : "Months"}
-                       </label>
-                       <input 
-                          type="number" 
-                          {...register("totalInstallments")} 
-                          className="w-full border rounded-lg px-3 py-2 text-sm"
-                          placeholder={frequency === "weekly" ? "52" : "12"}
-                       />
-                    </div>
+                    
+                    {/* ✅ SHOW ONLY IF WEEKLY */}
+                    {frequency === "weekly" ? (
+                      <div>
+                         <label className="block text-xs text-gray-600 mb-1">
+                           Total Weeks
+                         </label>
+                         <input 
+                            type="number" 
+                            {...register("totalInstallments")} 
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                            placeholder="52"
+                         />
+                      </div>
+                    ) : (
+                      /* If Monthly, show static text or nothing */
+                      <div className="flex flex-col justify-center">
+                         <span className="text-xs text-gray-400 uppercase font-bold">Duration</span>
+                         <span className="text-sm font-bold text-gray-700">12 Months (Fixed)</span>
+                      </div>
+                    )}
+
                     <div>
                        <label className="block text-xs text-gray-600 mb-1">
                          Amount / {frequency === "weekly" ? "Week" : "Month"}
                        </label>
-                       <input 
-                          type="number" 
-                          {...register("amountPerInstallment")} 
-                          className="w-full border rounded-lg px-3 py-2 text-sm" 
-                          placeholder="e.g. 50"
-                       />
+                       <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-400">₹</span>
+                          <input 
+                              type="number" 
+                              {...register("amountPerInstallment")} 
+                              className="w-full border rounded-lg pl-6 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                              placeholder="e.g. 50"
+                          />
+                       </div>
                     </div>
                  </div>
                )}
@@ -138,7 +164,7 @@ export default function CreateYearModal({ onSuccess, onClose }) {
             <input
               type="number"
               {...register("openingBalance")}
-              className="w-full border-2 border-gray-100 rounded-xl px-4 py-2 mt-1 focus:border-green-500 outline-none placeholder-gray-400"
+              className="w-full border-2 border-gray-100 rounded-xl px-4 py-2 mt-1 focus:border-green-500 outline-none placeholder-gray-400 transition-colors"
               placeholder="Leave empty to auto-transfer balance"
             />
             <p className="text-[10px] text-gray-400 mt-1 ml-1">

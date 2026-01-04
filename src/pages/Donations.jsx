@@ -3,8 +3,9 @@ import { useForm } from "react-hook-form";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { 
-  Plus, Search, Trash2, User, Phone, MapPin, IndianRupee, Loader2, Receipt, Calendar, AlertCircle, Lock 
+  Plus, Search, Trash2, User, Phone, MapPin, IndianRupee, Loader2, Receipt, Calendar, AlertCircle, Lock, Download 
 } from "lucide-react";
+import { exportDonationsPDF } from "../utils/pdfExport"; 
 
 export default function Donations() {
   const { activeClub } = useAuth();
@@ -17,7 +18,6 @@ export default function Donations() {
   // Fetch Donations
   const fetchDonations = async () => {
     try {
-      // Check if active year exists
       const yearRes = await api.get("/years/active");
       const activeYear = yearRes.data.data;
       
@@ -27,7 +27,6 @@ export default function Donations() {
       }
 
       setCycle(activeYear);
-
       const res = await api.get("/donations");
       setDonations(res.data.data);
     } catch (err) {
@@ -61,12 +60,20 @@ export default function Donations() {
     }
   };
 
+  // ✅ HANDLER: Export PDF
+  const handleExport = () => {
+    exportDonationsPDF({ 
+      clubName: activeClub?.clubName || activeClub?.name || "Club Committee", // Pass Club Name
+      cycleName: cycle?.name, 
+      donations: filteredDonations // Exports filtered list
+    });
+  };
+
   if (loading) {
     return <div className="text-center py-10 text-gray-500"><Loader2 className="animate-spin mx-auto mb-2"/>Loading records...</div>;
   }
 
   if (!cycle) {
-    // Admin view - Show alert to create year
     if (activeClub?.role === "admin") {
       return (
         <div className="p-8 text-center bg-red-50 text-red-600 rounded-xl border border-red-100 mt-6">
@@ -76,8 +83,6 @@ export default function Donations() {
         </div>
       );
     }
-
-    // Member view - Show locked message
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
         <div className="bg-gray-100 p-6 rounded-full mb-4">
@@ -121,17 +126,27 @@ export default function Donations() {
           />
         </div>
         
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-md"
-        >
-          <Plus size={20} /> New Donation
-        </button>
+        <div className="flex items-center gap-3">
+            {/* ✅ EXPORT BUTTON */}
+            <button 
+              onClick={handleExport}
+              className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:bg-gray-50 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
+              title="Download PDF Report"
+            >
+              <Download size={20} /> <span className="hidden sm:inline">Export</span>
+            </button>
+
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-md active:scale-95"
+            >
+              <Plus size={20} /> New Donation
+            </button>
+        </div>
       </div>
 
       {/* DONATIONS LIST */}
-      {
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredDonations.map((d) => (
             <div key={d._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition relative group">
               
@@ -179,8 +194,7 @@ export default function Donations() {
               No donations found.
             </div>
           )}
-        </div>
-      }
+      </div>
 
       {/* ADD MODAL */}
       {showAddModal && <AddDonationModal onClose={() => setShowAddModal(false)} refresh={fetchDonations} />}
@@ -188,9 +202,7 @@ export default function Donations() {
   );
 }
 
-// ---------------------------------------------
-// SUB-COMPONENT: Add Donation Modal
-// ---------------------------------------------
+// ... AddDonationModal (No Changes Needed) ...
 function AddDonationModal({ onClose, refresh }) {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const [loading, setLoading] = useState(false);

@@ -1,6 +1,8 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const sanitizeName = (s) => String(s || "").trim().replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+
 export function exportWeeklyAllMembersPDF({
   clubName = "Saraswati Club",
   members = [],
@@ -198,5 +200,5 @@ export function exportWeeklyAllMembersPDF({
     doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: "right" });
   }
 
-  doc.save("Weekly_Matrix_Report.pdf");
+  doc.save(`${sanitizeName(clubName)}_Weekly_Matrix_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
 }

@@ -1,7 +1,10 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const sanitizeName = (s) => String(s || "").trim().replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+
 export function exportFinancialReportPDF({
+  clubName = "Club",
   year,
   openingBalance,
   incomeSources,
@@ -21,11 +24,11 @@ export function exportFinancialReportPDF({
 
   doc.setFontSize(24);
   doc.setTextColor(255, 255, 255);
-  doc.text("CLUB FINANCIAL REPORT", 14, 20);
+  doc.text(clubName || "CLUB", 14, 20);
 
   doc.setFontSize(12);
   doc.setTextColor(220, 220, 255);
-  doc.text("Annual Financial Statement", 14, 32);
+  doc.text("Annual Financial Report", 14, 32);
 
   doc.setFontSize(10);
   doc.text(`Financial Year: ${year}`, 195, 20, { align: "right" });
@@ -174,5 +177,5 @@ export function exportFinancialReportPDF({
   doc.text("Treasurer Signature", 165, signatureY + 5, { align: "center" });
   doc.text("Committee", 165, signatureY + 10, { align: "center" });
 
-  doc.save(`Financial_Report_${year}.pdf`);
+  doc.save(`${sanitizeName(clubName)}_Financial_Report_${year}.pdf`);
 }

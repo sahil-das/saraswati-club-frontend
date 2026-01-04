@@ -3,9 +3,10 @@ import { useForm } from "react-hook-form";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { 
-  Plus, Search, Trash2, User, Phone, Mail, Loader2, UserPlus, Shield, UserCog, CreditCard 
+  Plus, Search, Trash2, User, Phone, Mail, Loader2, UserPlus, Shield, UserCog, CreditCard, Download 
 } from "lucide-react";
 import SubscriptionModal from "../components/SubscriptionModal";
+import { exportMembersPDF } from "../utils/pdfExport";
 
 export default function Members() {
   const { activeClub, user } = useAuth(); // 👈 Added 'user' to check ID
@@ -66,6 +67,13 @@ export default function Members() {
       alert("Failed to delete member");
     }
   };
+// ✅ EXPORT HANDLER
+  const handleExport = () => {
+    exportMembersPDF({
+      clubName: activeClub?.clubName || activeClub?.name || "Club Committee",
+      members: members // Exports the full list (or use filteredMembers if preferred)
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -79,12 +87,21 @@ export default function Members() {
         
         {/* 🔒 HIDE BUTTON IF NOT ADMIN */}
         {activeClub?.role === "admin" && (
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-200"
-          >
-            <Plus size={20} /> Add Member
-          </button>
+          <div className="flex gap-3">
+
+            <button 
+                  onClick={handleExport}
+                  className="bg-white text-indigo-600 border border-indigo-200 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-50 transition flex items-center gap-2 shadow-sm"
+              >
+                  <Download size={20} /> <span className="hidden sm:inline">Export List</span>
+            </button>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-200"
+            >
+              <Plus size={20} /> Add Member
+            </button>
+          </div>
         )}
       </div>
 
