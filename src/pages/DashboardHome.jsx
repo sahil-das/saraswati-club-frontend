@@ -1,14 +1,17 @@
-// src/pages/DashboardHome.jsx
-import React from "react";
-import { useAuth } from "../context/AuthContext";
-import { useFinance } from "../context/FinanceContext";
+import { useState, useEffect } from "react";
+import api from "../api/axios";
+import { useAuth } from "../context/AuthContext"; 
+import CreateYearModal from "../components/CreateYearModal";
+import AddExpenseModal from "../components/AddExpenseModal"; 
+import AddDonationModal from "../components/AddDonationModal"; 
+import AddMemberModal from "../components/AddMemberModal"; 
+import AddPujaModal from "../components/AddPujaModal"; 
+import NoticeBoard from "../components/NoticeBoard"; 
 
-import ResponsiveGrid from "../components/ResponsiveGrid";
-import StatCardPremium from "../components/StatCardPremium";
-import NoticeBoardWidget from "../components/NoticeBoardWidget";
-import ActivityItem from "../components/ActivityItem";
-import { StatSkeleton, ListSkeleton } from "../components/Skeletons";
-import useSkeleton from "../hooks/useSkeleton";
+import { 
+  Loader2, Wallet, TrendingUp, TrendingDown, PiggyBank, Calendar,
+  IndianRupee, Lock, PlusCircle, Sparkles, Receipt, UserPlus, Zap
+} from "lucide-react";
 
 export default function DashboardHome() {
   // Use hook-based accessors exported by your contexts
@@ -38,80 +41,59 @@ export default function DashboardHome() {
   const showSkeleton = useSkeleton(loading);
 
   return (
-    <main
-      className="p-4 sm:p-6 lg:p-8 space-y-8"
-      aria-label="Dashboard"
-    >
-      {/* Header */}
-      <header className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Welcome back, {user?.name} — {activeClub?.name}
-        </p>
-      </header>
+    <div className="space-y-8 pb-10">
+      
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">Financial Overview</h1>
+          <p className="text-gray-500 mt-1 flex items-center gap-2 text-sm">
+            <Calendar size={16} /> Current Cycle: 
+            <span className="font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full text-xs uppercase tracking-wide">{data?.yearName}</span>
+          </p>
+        </div>
+      </div>
 
-      {/* Stats */}
-      <ResponsiveGrid>
-        {showSkeleton ? (
-          <>
-            <StatSkeleton />
-            <StatSkeleton />
-            <StatSkeleton primary />
-          </>
-        ) : (
-          <>
-            <StatCardPremium
-              title="Collections"
-              value={totals?.collections}
-              variant="neutral"
-            />
-            <StatCardPremium
-              title="Expenses"
-              value={totals?.expenses}
-              variant="danger"
-            />
-            <StatCardPremium
-              title="Net Balance"
-              value={totals?.balance}
-              variant="primary"
-              primary
-            />
-          </>
-        )}
-      </ResponsiveGrid>
+      {/* MAIN STATS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <StatCard title="Total Income" amount={data?.totalIncome} icon={<TrendingUp size={24} />} color="bg-emerald-50 text-emerald-600 border-emerald-100"/>
+        <StatCard title="Total Expenses" amount={data?.totalExpense} icon={<TrendingDown size={24} />} color="bg-rose-50 text-rose-600 border-rose-100"/>
+        <StatCard title="Available Balance" amount={data?.balance} icon={<Wallet size={24} />} color="bg-indigo-600 text-white shadow-indigo-200 shadow-xl ring-2 ring-indigo-600 ring-offset-2" isPrimary/>
+        <StatCard title="Opening Balance" amount={data?.openingBalance} icon={<PiggyBank size={24} />} color="bg-gray-50 text-gray-600 border-gray-200"/>
+      </div>
+      {/* ✅ NEW: Notice Board Widget */}
+          <NoticeBoard />
+      {/* QUICK ACTIONS BAR */}
+      <div>
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+           <Zap size={16}/> Quick Actions
+        </h3>
+        <div className="flex flex-wrap gap-4">
+           {/* Add Expense (All) */}
+           <button 
+             onClick={() => setShowExpense(true)}
+             className="flex items-center gap-3 px-5 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-rose-200 hover:bg-rose-50 transition-all group"
+           >
+              <div className="p-2 bg-rose-100 text-rose-600 rounded-lg group-hover:bg-rose-200 transition-colors">
+                 <TrendingDown size={20} />
+              </div>
+              <div className="text-left">
+                 <p className="text-sm font-bold text-gray-700 group-hover:text-rose-700">Record Expense</p>
+                 <p className="text-[10px] text-gray-400">Add bill or voucher</p>
+              </div>
+           </button>
 
-      {/* Lower Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Notice Board */}
-        <NoticeBoardWidget />
-
-        {/* Activity */}
-        <div
-          className="lg:col-span-2 bg-card rounded-2xl shadow-sm border border-border"
-          role="region"
-          aria-labelledby="activity-title"
-        >
-          <header className="px-6 py-4 border-b border-border">
-            <h2
-              id="activity-title"
-              className="font-semibold text-lg"
-            >
-              Recent Activity
-            </h2>
-          </header>
-
-          <div className="divide-y divide-border">
-            {showSkeleton ? (
-              <ListSkeleton rows={4} />
-            ) : recentActivities?.length ? (
-              recentActivities.map((item) => (
-                <ActivityItem key={item.id} activity={item} />
-              ))
-            ) : (
-              <div className="p-6 text-sm text-muted-foreground">
-                No recent activity yet.
+           {/* Add Donation (All) */}
+           <button 
+             onClick={() => setShowDonation(true)}
+             className="flex items-center gap-3 px-5 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-amber-200 hover:bg-amber-50 transition-all group"
+           >
+              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg group-hover:bg-amber-200 transition-colors">
+                 <Receipt size={20} />
+              </div>
+              <div className="text-left">
+                 <p className="text-sm font-bold text-gray-700 group-hover:text-amber-700">Record Donation</p>
+                 <p className="text-[10px] text-gray-400">Public collection</p>
               </div>
             )}
           </div>

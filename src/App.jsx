@@ -13,8 +13,10 @@ import Dashboard from "./pages/Dashboard";
 import DashboardHome from "./pages/DashboardHome";
 import UserProfile from "./pages/UserProfile";
 import Settings from "./pages/Settings";
+import History from "./pages/History";
 import CollectionsOverview from "./pages/CollectionsOverview";
 import Contributions from "./pages/Contributions";
+import WeeklyContributions from "./pages/WeeklyContributions";
 import PujaContributions from "./pages/PujaContributions";
 import Donations from "./pages/Donations";
 import Expenses from "./pages/Expenses";
@@ -23,7 +25,6 @@ import MemberDetails from "./pages/MemberDetails";
 import Reports from "./pages/Reports";
 import RegisterClub from "./pages/RegisterClub";
 import AuditLogs from "./pages/AuditLogs";
-import Archives from "./pages/Archives";
 export default function App() {
   return (
     <AuthProvider>
@@ -37,17 +38,18 @@ export default function App() {
               
               <Route index element={<DashboardHome />} />
               <Route path="profile" element={<UserProfile />} />
-
+              <Route path="history" element={<History />} />
               
               {/* ✅ FESTIVAL CHANDA (Available to Everyone) */}
               <Route path="puja-contributions" element={<PujaContributions />} />
               <Route path="collections" element={<CollectionsOverview />} />
               <Route path="donations" element={<Donations />} />
               <Route path="expenses" element={<Expenses />} />
-              <Route path="archives" element={<Archives />} />
+
               {/* 🔒 SUBSCRIPTIONS (Blocked if 'None') */}
               <Route element={<RequireSubscription />}>
                  <Route path="contributions" element={<Contributions />} />
+                 <Route path="weekly" element={<WeeklyContributions />} />
               </Route>
 
               {/* --- Admin Only --- */}
