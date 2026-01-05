@@ -21,14 +21,15 @@ export default function TopBar({ onMenuClick }) {
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 h-16 flex items-center justify-between px-4 md:px-8 z-20 relative">
-      
-      {/* Left: Mobile Menu & Breadcrumb */}
-      <div className="flex items-center gap-4">
-        <button onClick={onMenuClick} className="md:hidden text-gray-500 hover:text-gray-700 p-1">
-          <Menu size={24} />
-        </button>
-        <h2 className="text-lg font-bold text-gray-800 md:hidden">Club Portal</h2>
-      </div>
+          
+          {/* Left: Mobile Menu & Breadcrumb */}
+          <div className="flex items-center gap-4">
+            <button onClick={onMenuClick} className="md:hidden text-gray-500 hover:text-gray-700 p-1">
+              <Menu size={24} />
+            </button>
+            {/* CHANGE THIS LINE 👇 */}
+            <h2 className="text-lg font-bold text-gray-800 md:hidden">ClubKhata</h2>
+          </div>
 
       {/* Right: Actions & Profile */}
       <div className="flex items-center gap-6">

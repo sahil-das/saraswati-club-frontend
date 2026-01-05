@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/axios";
-import { 
+import { useToast } from "../context/ToastContext";
+
+import {
   Building2, User, Mail, Lock, Phone, ArrowRight, Loader2, 
   Hash, LayoutDashboard, ShieldCheck, CheckCircle2 
 } from "lucide-react";
@@ -12,6 +14,8 @@ export default function RegisterClub() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+
+  const toast = useToast();
 
   const onSubmit = async (data) => {
     setLoading(true);
@@ -29,11 +33,11 @@ export default function RegisterClub() {
 
       if (res.data.success) {
         // You might want a nicer toast here in the future
-        alert("Club Registered! Please Login."); 
+        toast.success("Registration successful! Please login to continue."); 
         navigate("/login");
       }
     } catch (err) {
-      console.error(err);
+      toast.error(err.response?.data?.message || "Registration failed.");
       setServerError(err.response?.data?.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);

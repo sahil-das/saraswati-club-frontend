@@ -85,22 +85,23 @@ export default function Sidebar({ isOpen, onClose }) {
               collapsed ? "w-0 opacity-0" : "w-full opacity-100"
             }`}
           >
+            {/* Brand Icon (Fixed as 'CK') */}
             <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
-              <span className="font-bold text-white text-lg">
-                {activeClub?.clubName?.charAt(0)}
-              </span>
+              <span className="font-bold text-white text-xs tracking-tighter">CK</span>
             </div>
-            <div className="whitespace-nowrap">
-              <h2 className="text-sm font-bold truncate leading-tight">
-                {activeClub?.clubName || "Club Portal"}
+            
+            <div className="whitespace-nowrap overflow-hidden">
+              {/* Main Product Name */}
+              <h2 className="text-sm font-bold truncate leading-tight tracking-wide">
+                ClubKhata
               </h2>
-              <p className="text-[10px] text-indigo-300 uppercase tracking-widest font-semibold flex items-center gap-1">
-                {activeClub?.role === "admin" && <ShieldCheck size={10} />}
-                {activeClub?.role || "Member"}
+              
+              {/* Active Club Name (Subtitle) */}
+              <p className="text-[10px] text-indigo-300 uppercase tracking-wider font-semibold truncate flex items-center gap-1">
+                 {activeClub?.clubName || "Select Club"}
               </p>
             </div>
           </div>
-
           {/* Toggle Button (Desktop) */}
           <button
             onClick={() => setCollapsed(!collapsed)}

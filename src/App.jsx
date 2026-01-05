@@ -7,6 +7,7 @@ import { FinanceProvider } from "./context/FinanceContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RequireSubscription from "./components/RequireSubscription";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./context/ToastContext";
 // Pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard"; 
@@ -29,39 +30,41 @@ export default function App() {
     <AuthProvider>
       <FinanceProvider>
         <ThemeProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<RegisterClub />} />
+          <ToastProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<RegisterClub />} />
 
-              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
-                
-                <Route index element={<DashboardHome />} />
-                <Route path="profile" element={<UserProfile />} />
+                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
+                  
+                  <Route index element={<DashboardHome />} />
+                  <Route path="profile" element={<UserProfile />} />
 
-                
-                {/* ✅ FESTIVAL CHANDA (Available to Everyone) */}
-                <Route path="puja-contributions" element={<PujaContributions />} />
-                <Route path="collections" element={<CollectionsOverview />} />
-                <Route path="donations" element={<Donations />} />
-                <Route path="expenses" element={<Expenses />} />
-                <Route path="archives" element={<Archives />} />
-                {/* 🔒 SUBSCRIPTIONS (Blocked if 'None') */}
-                <Route element={<RequireSubscription />}>
-                  <Route path="contributions" element={<Contributions />} />
+                  
+                  {/* ✅ FESTIVAL CHANDA (Available to Everyone) */}
+                  <Route path="puja-contributions" element={<PujaContributions />} />
+                  <Route path="collections" element={<CollectionsOverview />} />
+                  <Route path="donations" element={<Donations />} />
+                  <Route path="expenses" element={<Expenses />} />
+                  <Route path="archives" element={<Archives />} />
+                  {/* 🔒 SUBSCRIPTIONS (Blocked if 'None') */}
+                  <Route element={<RequireSubscription />}>
+                    <Route path="contributions" element={<Contributions />} />
+                  </Route>
+
+                  {/* --- Admin Only --- */}
+                  <Route path="members" element={<ProtectedRoute role="admin"><Members /></ProtectedRoute>} />
+                  <Route path="members/:memberId" element={<ProtectedRoute role="admin"><MemberDetails /></ProtectedRoute>} />
+                  <Route path="reports" element={<ProtectedRoute role="admin"><Reports /></ProtectedRoute>} />
+                  <Route path="settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
+                  <Route path="audit-logs" element={<ProtectedRoute role="admin"><AuditLogs /></ProtectedRoute>} />
                 </Route>
 
-                {/* --- Admin Only --- */}
-                <Route path="members" element={<ProtectedRoute role="admin"><Members /></ProtectedRoute>} />
-                <Route path="members/:memberId" element={<ProtectedRoute role="admin"><MemberDetails /></ProtectedRoute>} />
-                <Route path="reports" element={<ProtectedRoute role="admin"><Reports /></ProtectedRoute>} />
-                <Route path="settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
-                <Route path="audit-logs" element={<ProtectedRoute role="admin"><AuditLogs /></ProtectedRoute>} />
-              </Route>
-
-              <Route path="*" element={<Navigate to="/login" />} />
-            </Routes>
-          </BrowserRouter>
+                <Route path="*" element={<Navigate to="/login" />} />
+              </Routes>
+            </BrowserRouter>
+          </ToastProvider>
         </ThemeProvider>
       </FinanceProvider>
     </AuthProvider>
