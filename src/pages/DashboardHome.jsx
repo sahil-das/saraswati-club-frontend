@@ -6,7 +6,6 @@ import AddExpenseModal from "../components/AddExpenseModal";
 import AddDonationModal from "../components/AddDonationModal"; 
 import AddMemberModal from "../components/AddMemberModal"; 
 import AddPujaModal from "../components/AddPujaModal"; 
-import NoticeBoard from "../components/NoticeBoard"; 
 
 import { 
   Loader2, Wallet, TrendingUp, TrendingDown, PiggyBank, Calendar,
@@ -61,8 +60,7 @@ export default function DashboardHome() {
         <StatCard title="Available Balance" amount={data?.balance} icon={<Wallet size={24} />} color="bg-indigo-600 text-white shadow-indigo-200 shadow-xl ring-2 ring-indigo-600 ring-offset-2" isPrimary/>
         <StatCard title="Opening Balance" amount={data?.openingBalance} icon={<PiggyBank size={24} />} color="bg-gray-50 text-gray-600 border-gray-200"/>
       </div>
-      {/* ✅ NEW: Notice Board Widget */}
-          <NoticeBoard />
+
       {/* QUICK ACTIONS BAR */}
       <div>
         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
