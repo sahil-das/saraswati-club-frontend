@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import api from "../api/axios";
+import { addFestivalFee } from "../api/festival"; // 👈 API
+import { useToast } from "../context/ToastContext"; // 👈 Toast
 import { X, IndianRupee, User, FileText, Loader2, ChevronDown } from "lucide-react";
 
 // Design System
@@ -11,9 +13,9 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
   const { register, handleSubmit, setValue } = useForm();
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
+  const toast = useToast();
 
   useEffect(() => {
-    // Fetch members for the dropdown
     const loadMembers = async () => {
         try {
             const res = await api.get("/members");
@@ -31,11 +33,12 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await api.post("/member-fees", { ...data, amount: Number(data.amount) });
-      refresh();
+      await addFestivalFee({ ...data, amount: Number(data.amount) });
+      toast.success("Festival fee recorded successfully");
+      if(refresh) refresh();
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to add fee");
+      toast.error(err.response?.data?.message || "Failed to add fee");
     } finally {
       setLoading(false);
     }
@@ -43,8 +46,9 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
+        {/* HEADER: Rose Theme */}
         <div className="bg-rose-600 px-6 py-4 flex justify-between items-center text-white">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -52,7 +56,7 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
             </h2>
             <p className="text-rose-100 text-xs">Record extra collection (Chanda)</p>
           </div>
-          <button onClick={onClose} className="text-white/80 hover:text-white transition">
+          <button onClick={onClose} className="p-1 hover:bg-rose-700 rounded-lg transition-colors text-white/80 hover:text-white">
              <X size={24} />
           </button>
         </div>

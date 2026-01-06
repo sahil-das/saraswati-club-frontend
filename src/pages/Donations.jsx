@@ -1,30 +1,36 @@
 import { useState, useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
-import api from "../api/axios";
+import { fetchDonations, deleteDonation } from "../api/donations"; // 👈 New API
 import { useAuth } from "../context/AuthContext";
-import { 
-  Plus, Search, Trash2, User, Phone, MapPin, IndianRupee, 
-  Loader2, Receipt, Calendar, AlertCircle, Lock, Download, 
-  Filter, ChevronDown, Heart 
-} from "lucide-react";
-import { clsx } from "clsx";
+import { useToast } from "../context/ToastContext"; // 👈 Toast
 
-// Design System
+// Icons
+import { 
+  Plus, Search, Trash2, Heart, Receipt, Calendar, 
+  Loader2, AlertCircle, Lock, Download, Filter 
+} from "lucide-react";
+
+// Components
 import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
+import ConfirmModal from "../components/ui/ConfirmModal"; // 👈 Confirm Modal
+import AddDonationModal from "../components/AddDonationModal"; 
+import api from "../api/axios"; // Keep for cycle check only
 import { exportDonationsPDF } from "../utils/pdfExport"; 
 
 export default function Donations() {
   const { activeClub } = useAuth();
+  const toast = useToast();
+  
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [cycle, setCycle] = useState(null);
 
-  // Fetch Donations
-  const fetchDonations = async () => {
+  // Confirm Delete State
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
+
+  const loadDonations = async () => {
     try {
       const yearRes = await api.get("/years/active");
       const activeYear = yearRes.data.data;
@@ -35,23 +41,22 @@ export default function Donations() {
       }
 
       setCycle(activeYear);
-      const res = await api.get("/donations");
+      const res = await fetchDonations();
       setDonations(res.data.data);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to load donations");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDonations();
+    loadDonations();
   }, [activeClub]);
 
-  // Calculate Total
   const totalAmount = donations.reduce((sum, d) => sum + d.amount, 0);
 
-  // Filter Logic
   const filteredDonations = useMemo(() => {
       return donations.filter(d => 
         d.donorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -60,40 +65,42 @@ export default function Donations() {
       );
   }, [donations, searchTerm]);
 
-  // Delete Handler
-  const handleDelete = async (id) => {
-    if(activeClub?.role !== "admin") return;
-    if(!window.confirm("Delete this donation record? This will affect the total balance.")) return;
+  // Handle Delete
+  const handleDelete = async () => {
     try {
-      await api.delete(`/donations/${id}`);
-      setDonations(donations.filter(d => d._id !== id));
+      await deleteDonation(confirmDelete.id);
+      setDonations(prev => prev.filter(d => d._id !== confirmDelete.id));
+      toast.success("Donation record removed");
     } catch (err) {
-      console.error("Failed to delete");
+      toast.error("Failed to delete record");
+    } finally {
+      setConfirmDelete({ isOpen: false, id: null });
     }
   };
 
-  if (loading) return <LoadingState />;
+  if (loading) return <div className="flex justify-center py-20 text-amber-500"><Loader2 className="animate-spin" /></div>;
   if (!cycle) return <NoCycleState isAdmin={activeClub?.role === "admin"} />;
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in relative">
+    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
       
       {/* 1. HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
            <div className="flex items-center gap-3">
-             <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+             <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl">
                 <Heart size={24} fill="currentColor" className="opacity-80" />
              </div>
-             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Public Donations</h1>
+             <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Public Donations</h1>
+                <p className="text-slate-500 text-sm font-medium">
+                  Collection Cycle: {cycle.name}
+                </p>
+             </div>
            </div>
-           <p className="text-slate-500 text-sm mt-1 ml-1">
-             Collections for <span className="font-bold text-slate-700">{cycle.name}</span>
-           </p>
         </div>
         
         <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-            
             {/* TOTAL BADGE */}
             <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl sm:bg-transparent sm:p-0 sm:border-none sm:text-right flex justify-between sm:block items-center">
                 <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Total Collected</p>
@@ -111,9 +118,8 @@ export default function Donations() {
       </div>
 
       {/* 2. TOOLBAR */}
-      <Card noPadding className="sticky top-20 z-10 shadow-sm border-slate-200">
+      <Card noPadding className="shadow-sm border-slate-200">
         <div className="p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
-            {/* Search */}
             <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
                 <input 
@@ -125,7 +131,6 @@ export default function Donations() {
                 />
             </div>
 
-            {/* Export */}
             <Button 
                 variant="secondary" 
                 size="sm"
@@ -210,7 +215,7 @@ export default function Donations() {
                             <div className="col-span-1 w-full flex justify-end">
                                 {activeClub?.role === "admin" && (
                                     <button 
-                                        onClick={() => handleDelete(d._id)}
+                                        onClick={() => setConfirmDelete({ isOpen: true, id: d._id })}
                                         className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all md:opacity-0 group-hover:opacity-100"
                                         title="Delete Record"
                                     >
@@ -225,117 +230,19 @@ export default function Donations() {
          )}
       </div>
 
-      {/* ADD MODAL */}
-      {showAddModal && <AddDonationModal onClose={() => setShowAddModal(false)} refresh={fetchDonations} />}
+      {/* MODALS */}
+      {showAddModal && <AddDonationModal onClose={() => setShowAddModal(false)} refresh={loadDonations} />}
+      
+      <ConfirmModal 
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, id: null })}
+        onConfirm={handleDelete}
+        title="Delete Donation?"
+        message="This will remove the amount from the total collection. This cannot be undone."
+        isDangerous={true}
+      />
     </div>
   );
-}
-
-/* ================= HELPERS ================= */
-
-function AddDonationModal({ onClose, refresh }) {
-  const { register, handleSubmit } = useForm();
-  const [loading, setLoading] = useState(false);
-
-  const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      await api.post("/donations", { ...data, amount: Number(data.amount) });
-      refresh();
-      onClose();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-        
-        <div className="bg-amber-500 px-6 py-4 flex justify-between items-center text-white">
-          <div>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-                <Receipt size={20} className="opacity-80"/> Record Donation
-            </h2>
-            <p className="text-amber-100 text-xs">Add amount to festival fund</p>
-          </div>
-          <button onClick={onClose} className="text-white/80 hover:text-white transition">
-              <ChevronDown className="rotate-180" size={24}/>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-          
-            <div>
-                <Input 
-                    label="Donor Name"
-                    icon={User}
-                    placeholder="e.g. Amit Store"
-                    {...register("donorName", { required: true })}
-                />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Input 
-                        label="Amount (₹)"
-                        type="number"
-                        icon={IndianRupee}
-                        placeholder="500"
-                        {...register("amount", { required: true })}
-                    />
-                </div>
-                <div>
-                    <Input 
-                        label="Receipt No"
-                        placeholder="Optional"
-                        {...register("receiptNo")}
-                    />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Input 
-                        label="Phone"
-                        icon={Phone}
-                        placeholder="Optional"
-                        {...register("phone")}
-                    />
-                </div>
-                <div>
-                    <Input 
-                        label="Address"
-                        icon={MapPin}
-                        placeholder="City/Area"
-                        {...register("address")}
-                    />
-                </div>
-            </div>
-
-            <div className="pt-2">
-                <Button 
-                    type="submit" 
-                    className="w-full bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-200 border-none"
-                    isLoading={loading}
-                >
-                    Save Record
-                </Button>
-            </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function LoadingState() {
-    return (
-        <div className="min-h-[60vh] flex items-center justify-center text-amber-500">
-            <Loader2 className="animate-spin w-10 h-10"/>
-        </div>
-    );
 }
 
 function NoCycleState({ isAdmin }) {

@@ -2,20 +2,23 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/axios";
-import { useToast } from "../context/ToastContext";
-
-import {
+import { useToast } from "../context/ToastContext"; // 👈 Toast
+import { 
   Building2, User, Mail, Lock, Phone, ArrowRight, Loader2, 
-  Hash, LayoutDashboard, ShieldCheck, CheckCircle2 
+  Hash, CheckCircle2, ShieldCheck 
 } from "lucide-react";
+
+// Components
+import { Input } from "../components/ui/Input"; // 👈 UI Component
+import { Button } from "../components/ui/Button";
 
 export default function RegisterClub() {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
+  const toast = useToast();
+  
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
-
-  const toast = useToast();
 
   const onSubmit = async (data) => {
     setLoading(true);
@@ -32,34 +35,36 @@ export default function RegisterClub() {
       });
 
       if (res.data.success) {
-        // You might want a nicer toast here in the future
-        toast.success("Registration successful! Please login to continue."); 
+        toast.success("Club registered successfully! Please login.");
         navigate("/login");
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Registration failed.");
-      setServerError(err.response?.data?.message || "Registration failed. Please try again.");
+      console.error(err);
+      const msg = err.response?.data?.message || "Registration failed. Please try again.";
+      setServerError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 lg:p-8 font-sans">
       
       {/* Main Card Container */}
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col lg:flex-row min-h-[600px]">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col lg:flex-row min-h-[600px] border border-slate-200">
         
-        {/* LEFT PANEL: Visual / Marketing (Hidden on Mobile) */}
+        {/* LEFT PANEL: Marketing (Visible on Large Screens) */}
         <div className="hidden lg:flex lg:w-5/12 bg-indigo-900 text-white p-12 flex-col justify-between relative overflow-hidden">
-          {/* Background Decor */}
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-600 to-indigo-900 opacity-90 z-10"></div>
-          <div className="absolute -top-20 -left-20 w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-50 z-0"></div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-purple-600 rounded-full blur-3xl opacity-40 z-0"></div>
+          
+          {/* Background Effects */}
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-600 to-indigo-900 opacity-90 z-10" />
+          <div className="absolute -top-20 -left-20 w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-50 z-0" />
+          <div className="absolute bottom-0 right-0 w-80 h-80 bg-purple-600 rounded-full blur-3xl opacity-40 z-0" />
 
-          {/* Content */}
+          {/* Brand Content */}
           <div className="relative z-20">
-            <div className="flex items-center gap-2 mb-8">
+            <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-700 font-bold text-xl shadow-lg">
                 CK
               </div>
@@ -67,40 +72,39 @@ export default function RegisterClub() {
             </div>
             
             <h2 className="text-4xl font-bold leading-tight mb-6">
-              Manage your community finances with ease.
+              Modern finance for your community.
             </h2>
             <p className="text-indigo-100 text-lg leading-relaxed opacity-90">
               Track subscriptions, manage expenses, and keep your club members transparently informed.
             </p>
           </div>
 
+          {/* Feature List */}
           <div className="relative z-20 space-y-4">
-            <div className="flex items-center gap-3 text-sm font-medium text-indigo-200">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>Transparent Fund Tracking</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm font-medium text-indigo-200">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>Automated Subscription Logs</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm font-medium text-indigo-200">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>Expense Vouchers & Audit</span>
-            </div>
+            {[
+              "Transparent Fund Tracking",
+              "Automated Subscription Logs", 
+              "Expense Vouchers & Audit"
+            ].map((feature, i) => (
+              <div key={i} className="flex items-center gap-3 text-sm font-medium text-indigo-200">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <span>{feature}</span>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* RIGHT PANEL: Registration Form */}
-        <div className="w-full lg:w-7/12 p-8 md:p-12 lg:p-16 overflow-y-auto">
+        <div className="w-full lg:w-7/12 p-8 md:p-12 overflow-y-auto bg-white">
           
           <div className="max-w-lg mx-auto">
-            <div className="mb-10">
-              <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
-              <p className="text-gray-500 mt-2">Start your club's digital journey today.</p>
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-slate-900">Create Account</h2>
+              <p className="text-slate-500 mt-2">Start your club's digital journey today.</p>
             </div>
 
             {serverError && (
-              <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl mb-6 text-sm flex items-start gap-3">
+              <div className="bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-xl mb-6 text-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
                 <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold">Registration Failed</p>
@@ -109,124 +113,106 @@ export default function RegisterClub() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               
               {/* SECTION 1: ORGANIZATION */}
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                   <Building2 size={18} className="text-indigo-600" />
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Organization Details</h3>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Organization Details</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 ml-1">Club Name</label>
-                    <div className="relative group">
-                      <Building2 className="absolute left-3 top-3 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                      <input
-                        {...register("clubName", { required: "Club Name is required" })}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-gray-700 placeholder:text-gray-300"
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 ml-1">Club Name</label>
+                    <Input 
                         placeholder="e.g. Netaji Sangha"
-                      />
-                    </div>
+                        icon={Building2}
+                        {...register("clubName", { required: "Required" })}
+                    />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 ml-1">Unique Club Code</label>
-                    <div className="relative group">
-                      <Hash className="absolute left-3 top-3 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                      <input
-                        {...register("clubCode", { 
-                          required: "Code is required",
-                          pattern: { value: /^[a-zA-Z0-9-]+$/, message: "No spaces or special chars" } 
-                        })}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-gray-700 placeholder:text-gray-300 lowercase"
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 ml-1">Club Code</label>
+                    <Input 
                         placeholder="e.g. netaji-2025"
-                      />
-                    </div>
+                        icon={Hash}
+                        {...register("clubCode", { 
+                          required: "Required",
+                          pattern: { value: /^[a-zA-Z0-9-]+$/, message: "No spaces" } 
+                        })}
+                    />
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 ml-1">
-                  * Club Code will be used by members to find your club. Keep it simple.
+                <p className="text-[10px] text-slate-400 ml-1 italic">
+                  * Club Code is unique and used for member login.
                 </p>
               </div>
 
               {/* SECTION 2: ADMIN */}
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 pt-2">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 pt-2">
                   <User size={18} className="text-indigo-600" />
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Admin Access</h3>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Admin Access</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 ml-1">Admin Full Name</label>
-                    <div className="relative group">
-                      <User className="absolute left-3 top-3 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                      <input
-                        {...register("adminName", { required: true })}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-gray-700 placeholder:text-gray-300"
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 ml-1">Admin Name</label>
+                    <Input 
                         placeholder="John Doe"
-                      />
-                    </div>
+                        icon={User}
+                        {...register("adminName", { required: true })}
+                    />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 ml-1">Phone Number</label>
-                    <div className="relative group">
-                      <Phone className="absolute left-3 top-3 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                      <input
-                        {...register("phone")}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-gray-700 placeholder:text-gray-300"
-                        placeholder="+91 98765 43210"
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 ml-1">Phone</label>
+                    <Input 
+                        placeholder="+91..."
+                        icon={Phone}
+                        {...register("phone", { required: true })}
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 ml-1">Email Address</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-3 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                    <input
-                      {...register("email", { required: true })}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Email Address</label>
+                  <Input 
                       type="email"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-gray-700 placeholder:text-gray-300"
                       placeholder="admin@example.com"
-                    />
-                  </div>
+                      icon={Mail}
+                      {...register("email", { required: true })}
+                  />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 ml-1">Password</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3 top-3 text-gray-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                    <input
-                      {...register("password", { required: true, minLength: 6 })}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Password</label>
+                  <Input 
                       type="password"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-gray-700 placeholder:text-gray-300"
                       placeholder="••••••••"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 ml-1">Must be at least 6 characters.</p>
+                      icon={Lock}
+                      {...register("password", { required: true, minLength: 6 })}
+                  />
+                  <p className="text-[10px] text-slate-400 ml-1">Min 6 characters.</p>
                 </div>
               </div>
 
               <div className="pt-4">
-                <button
+                <Button
                   type="submit"
-                  disabled={loading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 font-bold text-sm tracking-wide disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full py-3.5 shadow-lg shadow-indigo-200"
+                  isLoading={loading}
+                  rightIcon={<ArrowRight size={18} />}
                 >
-                  {loading ? <Loader2 className="animate-spin" /> : "Complete Registration"} 
-                  {!loading && <ArrowRight size={18} />}
-                </button>
+                  Complete Registration
+                </Button>
               </div>
 
             </form>
 
-            <div className="text-center mt-8 pt-6 border-t border-gray-50">
-               <p className="text-gray-500 text-sm">
+            <div className="text-center mt-8 pt-6 border-t border-slate-50">
+               <p className="text-slate-500 text-sm font-medium">
                  Already managing a club?{" "}
                  <Link to="/login" className="text-indigo-600 font-bold hover:underline hover:text-indigo-700">
                    Sign in here

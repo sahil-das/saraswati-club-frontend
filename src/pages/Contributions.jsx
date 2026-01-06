@@ -4,13 +4,12 @@ import { useAuth } from "../context/AuthContext";
 import { useFinance } from "../context/FinanceContext";
 import { 
   Check, ChevronDown, ChevronRight, AlertCircle, 
-  CreditCard, IndianRupee, Download, CalendarRange, Lock 
+  CreditCard, IndianRupee, Download, CalendarRange, Lock, RefreshCw 
 } from "lucide-react";
 import { clsx } from "clsx";
 
 // Design System
 import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
 import { exportWeeklyAllMembersPDF } from "../utils/exportWeeklyAllMembersPDF";
 
 export default function Contributions() {
@@ -25,62 +24,59 @@ export default function Contributions() {
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-
-        // 1. Get Active Cycle
-        const yearRes = await api.get("/years/active");
-        const activeYear = yearRes.data.data;
-        
-        if (!activeYear) {
-            setLoading(false);
-            return;
-        }
-
-        setCycle({
-            ...activeYear,
-            subscriptionFrequency: activeYear.subscriptionFrequency || 'weekly',
-            totalInstallments: activeYear.totalInstallments || 52,
-            amountPerInstallment: activeYear.amountPerInstallment || 0
-        });
-
-        // 2. Get Members & Subs
-        const [memberRes, subRes] = await Promise.all([
-           api.get("/members"),
-           // We can optimize this by fetching all subs in one go if API supports, 
-           // but for now we map client-side or use existing pattern
-        ]);
-        
-        const memberList = memberRes.data.data;
-
-        // Fetch subscriptions in parallel
-        const membersWithSubs = await Promise.all(
-          memberList.map(async (m) => {
-            try {
-              const res = await api.get(`/subscriptions/member/${m.membershipId}`);
-              return { ...m, subscription: res.data.data.subscription };
-            } catch {
-              return { ...m, subscription: null };
-            }
-          })
-        );
-
-        setMembers(membersWithSubs);
-      } catch (err) {
-        console.error("Contributions Load Error", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, []);
 
-  /* ================= CALCULATIONS ================= */
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // 1. Get Active Cycle
+      const yearRes = await api.get("/years/active");
+      const activeYear = yearRes.data.data;
+      
+      if (!activeYear) {
+          setLoading(false);
+          return;
+      }
+
+      setCycle({
+          ...activeYear,
+          subscriptionFrequency: activeYear.subscriptionFrequency || 'weekly',
+          totalInstallments: activeYear.totalInstallments || 52,
+          amountPerInstallment: activeYear.amountPerInstallment || 0
+      });
+
+      // 2. Get Members
+      const memberRes = await api.get("/members");
+      const memberList = memberRes.data.data;
+
+      // 3. Fetch subscriptions in parallel
+      const membersWithSubs = await Promise.all(
+        memberList.map(async (m) => {
+          // Use _id as fallback if membershipId is missing
+          const idToFetch = m.membershipId || m._id; 
+          try {
+            const res = await api.get(`/subscriptions/member/${idToFetch}`);
+            return { ...m, subscription: res.data.data.subscription };
+          } catch (err) {
+            console.error(`Failed to load sub for ${m.name}`, err);
+            return { ...m, subscription: null, error: true };
+          }
+        })
+      );
+
+      setMembers(membersWithSubs);
+    } catch (err) {
+      console.error("Contributions Load Error", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= ACTIONS ================= */
   const totalCollected = members.reduce((sum, m) => sum + (m.subscription?.totalPaid || 0), 0);
   
-  // Handlers
   const toggleExpand = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const handlePayment = async (memberId, subscriptionId, installmentNumber) => {
@@ -93,16 +89,27 @@ export default function Contributions() {
       const res = await api.post("/subscriptions/pay", { subscriptionId, installmentNumber });
       
       setMembers((prev) => prev.map((m) => 
-        m.membershipId === memberId ? { ...m, subscription: res.data.data } : m
+        m.membershipId === memberId ? { ...m, subscription: res.data.data, error: false } : m
       ));
       
       fetchCentralFund();
     } catch (err) {
-      // Use Toast in future, simple alert for now
-      console.error(err);
+      alert("Payment failed: " + (err.response?.data?.message || err.message));
     } finally {
       setProcessing(null);
     }
+  };
+
+  const retrySubscription = async (m) => {
+      const idToFetch = m.membershipId || m._id;
+      try {
+        const res = await api.get(`/subscriptions/member/${idToFetch}`);
+        setMembers(prev => prev.map(curr => 
+            curr._id === m._id ? { ...curr, subscription: res.data.data.subscription, error: false } : curr
+        ));
+      } catch (err) {
+          alert("Retry failed. Check network or backend.");
+      }
   };
 
   const handleExport = () => {
@@ -138,17 +145,16 @@ export default function Contributions() {
 
   /* ================= RENDER ================= */
   if (loading) return <SkeletonLoader />;
-
   if (!cycle) return <NoCycleState isAdmin={activeClub?.role === "admin"} />;
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
       
-      {/* 1. DASHBOARD HEADER */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
            <div className="flex items-center gap-3 mb-2">
-             <div className="p-2 bg-primary-100 text-primary-600 rounded-lg">
+             <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
                <CalendarRange size={24} />
              </div>
              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -182,10 +188,28 @@ export default function Contributions() {
         </div>
       </div>
 
-      {/* 2. MEMBER LIST */}
+      {/* MEMBER LIST */}
       <div className="space-y-4">
         {visibleMembers.map((m) => {
-          if (!m.subscription) return null;
+          // Fallback if subscription failed to load
+          if (!m.subscription) {
+              return (
+                <div key={m._id} className="bg-white border border-red-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center font-bold">
+                            !
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-slate-800">{m.name}</h3>
+                            <p className="text-xs text-red-400">Subscription data unavailable</p>
+                        </div>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => retrySubscription(m)}>
+                        <RefreshCw size={14} className="mr-2"/> Retry
+                    </Button>
+                </div>
+              );
+          }
 
           const isOpen = expanded[m.membershipId];
           const paidCount = m.subscription.installments.filter(i => i.isPaid).length;
@@ -197,21 +221,21 @@ export default function Contributions() {
               key={m.membershipId} 
               className={clsx(
                 "bg-white border rounded-[var(--radius-xl)] transition-all duration-300 overflow-hidden",
-                isComplete ? "border-emerald-200 shadow-sm" : "border-slate-200 shadow-sm hover:shadow-md hover:border-primary-200"
+                isComplete ? "border-emerald-200 shadow-sm" : "border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200"
               )}
             >
-              {/* HEADER ROW */}
+              {/* MEMBER HEADER ROW */}
               <div 
                 onClick={() => toggleExpand(m.membershipId)}
                 className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors"
               >
                 <div className="flex items-center gap-4">
-                   {/* Avatar / Progress Circle */}
+                   {/* Progress Circle */}
                    <div className="relative w-12 h-12 flex items-center justify-center">
                       <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
                         <path className="text-slate-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                         <path 
-                          className={isComplete ? "text-emerald-500" : "text-primary-600"} 
+                          className={isComplete ? "text-emerald-500" : "text-indigo-600"} 
                           strokeDasharray={`${progress}, 100`} 
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
                           fill="none" 
@@ -225,7 +249,7 @@ export default function Contributions() {
                    <div>
                       <h3 className="font-bold text-slate-800 text-base">{m.name}</h3>
                       <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        <span className={isComplete ? "text-emerald-600 font-bold" : "text-primary-600 font-bold"}>
+                        <span className={isComplete ? "text-emerald-600 font-bold" : "text-indigo-600 font-bold"}>
                            {paidCount} 
                         </span>
                         <span className="text-slate-400"> / {cycle.totalInstallments} paid</span>
@@ -238,12 +262,12 @@ export default function Contributions() {
                 </div>
               </div>
 
-              {/* GRID BODY */}
+              {/* INSTALLMENT GRID */}
               {isOpen && (
                 <div className="px-5 pb-6 pt-0 animate-slide-up">
                     <div className="h-px w-full bg-slate-100 mb-4" />
                     
-                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-2">
                         {m.subscription.installments.map((inst) => {
                             const isProcessing = processing === `${m.membershipId}-${inst.number}`;
                             
@@ -259,7 +283,7 @@ export default function Contributions() {
                                         "h-10 rounded-lg border text-[10px] font-bold transition-all duration-200 flex items-center justify-center relative",
                                         inst.isPaid 
                                             ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
-                                            : "bg-white border-slate-200 text-slate-400 hover:border-primary-300 hover:text-primary-600",
+                                            : "bg-white border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-600",
                                         isProcessing && "opacity-50 cursor-wait",
                                         activeClub?.role !== 'admin' && !inst.isPaid && "opacity-50 cursor-not-allowed bg-slate-50"
                                     )}
@@ -279,8 +303,7 @@ export default function Contributions() {
   );
 }
 
-/* --- SUB-COMPONENTS --- */
-
+// ... Sub-components (StatBadge, SkeletonLoader, NoCycleState) stay the same ...
 function StatBadge({ label, value, sub, icon: Icon, color }) {
     const colors = {
         emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",

@@ -1,5 +1,6 @@
+import { path } from "framer-motion/client";
 import { 
-  LayoutDashboard, Users, Wallet, CreditCard, 
+  LayoutDashboard, Users, Wallet, CreditCard, Heart,Sparkles,PieChart,
   IndianRupee, History, Settings, FileText, Archive, CalendarRange 
 } from "lucide-react";
 
@@ -26,7 +27,7 @@ const NAV_ITEMS = [
   { 
     label: "Puja Chanda", 
     path: "/puja-contributions", 
-    icon: IndianRupee,
+    icon: Sparkles,
     roles: ["admin", "member"] 
   },
   { 
@@ -38,7 +39,7 @@ const NAV_ITEMS = [
   { 
     label: "Donations", 
     path: "/donations", 
-    icon: CreditCard,
+    icon: Heart,
     roles: ["admin", "member"] 
   },
   { 
@@ -46,6 +47,12 @@ const NAV_ITEMS = [
     path: "/expenses", 
     icon: FileText,
     roles: ["admin", "member"] 
+  },
+  {
+    label: "Audit Logs",
+    path: "/audit-logs",
+    icon: History,
+    roles: ["admin","member"]
   },
   { 
     label: "Archives", 
@@ -57,7 +64,7 @@ const NAV_ITEMS = [
   { 
     label: "Reports", 
     path: "/reports", 
-    icon: History,
+    icon: PieChart,
     roles: ["admin"] 
   },
   { 

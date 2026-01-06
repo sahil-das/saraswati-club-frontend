@@ -182,11 +182,10 @@ export default function Reports() {
           color="rose" 
         />
         <StatCard 
-          label="Net Balance" 
+          title="Net Balance" 
           amount={summary.closing} 
           icon={IndianRupee} 
           color="indigo" 
-          highlight 
         />
       </div>
 

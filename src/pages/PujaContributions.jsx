@@ -1,21 +1,27 @@
 import { useEffect, useState, useMemo } from "react";
-import api from "../api/axios";
+import api from "../api/axios"; // Keep for fetching members/years
+import { fetchFestivalFees, addFestivalFee, deleteFestivalFee } from "../api/festival"; // 👈 New API
 import { useFinance } from "../context/FinanceContext";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext"; // 👈 Toast
+
+// Icons
 import { 
   Loader2, IndianRupee, User, Plus, Trash2, Calendar, 
-  Search, Filter, Download, X, Banknote, ChevronDown 
+  Search, Filter, Download, X, Banknote, ChevronDown, Sparkles 
 } from "lucide-react";
 
-// Design System
+// Components
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
+import ConfirmModal from "../components/ui/ConfirmModal"; // 👈 Confirm Modal
 import { exportPujaPDF } from "../utils/pdfExport";
 
 export default function PujaContributions() {
   const { fetchCentralFund, pujaTotal } = useFinance();
   const { activeClub } = useAuth(); 
+  const toast = useToast();
 
   const [members, setMembers] = useState([]);
   const [rows, setRows] = useState([]);
@@ -24,19 +30,24 @@ export default function PujaContributions() {
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Mobile Form State
+  // Mobile Form & Delete State
   const [showMobileForm, setShowMobileForm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
   // Form State
   const [form, setForm] = useState({ userId: "", amount: "", notes: "" });
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    const load = async () => {
+    loadData();
+  }, [activeClub]);
+
+  const loadData = async () => {
       try {
+        setLoading(true);
         const [mRes, pRes, yearRes] = await Promise.all([
           api.get("/members"),
-          api.get("/member-fees"),
+          fetchFestivalFees(), // 👈 Use API
           api.get("/years/active"),
         ]);
         
@@ -47,46 +58,50 @@ export default function PujaContributions() {
         await fetchCentralFund(); 
       } catch (err) {
         console.error("Data load error", err);
+        toast.error("Failed to load festival data");
       } finally {
         setLoading(false);
       }
-    };
-    load();
-  }, []);
+  };
 
   /* ================= HANDLERS ================= */
-  const addContribution = async (e) => {
+  const handleAddContribution = async (e) => {
     e.preventDefault();
     if (!form.userId || !form.amount) return;
 
     setSubmitting(true);
     try {
-      await api.post("/member-fees", {
+      await addFestivalFee({
         userId: form.userId, 
         amount: Number(form.amount),
         notes: form.notes
       });
+      
+      toast.success("Festival fee recorded!");
       setForm({ userId: "", amount: "", notes: "" });
       setShowMobileForm(false); 
       
-      const res = await api.get("/member-fees");
+      // Refresh Data
+      const res = await fetchFestivalFees();
       setRows(res.data.data || []);
       await fetchCentralFund();
     } catch (err) {
-      console.error(err); 
+      toast.error(err.response?.data?.message || "Failed to add record");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const deleteRow = async (id) => {
-    if(!window.confirm("Delete this record permanently?")) return;
+  const handleDelete = async () => {
     try {
-      await api.delete(`/member-fees/${id}`);
-      setRows(rows.filter(r => r._id !== id));
-      fetchCentralFund();
+      await deleteFestivalFee(confirmDelete.id);
+      setRows(rows.filter(r => r._id !== confirmDelete.id));
+      await fetchCentralFund();
+      toast.success("Record deleted");
     } catch (err) {
-      console.error("Failed to delete", err);
+      toast.error("Failed to delete record");
+    } finally {
+      setConfirmDelete({ isOpen: false, id: null });
     }
   };
 
@@ -101,15 +116,13 @@ export default function PujaContributions() {
   
   // The Contribution Form (Reusable)
   const ContributionForm = () => (
-    <form onSubmit={addContribution} className="space-y-4">
+    <form onSubmit={handleAddContribution} className="space-y-4">
         <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
             <div className="relative">
-                {/* Left Icon */}
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                
                 <select
-                    className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                    className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all"
                     value={form.userId}
                     onChange={(e) => setForm({ ...form, userId: e.target.value })}
                     required
@@ -119,8 +132,6 @@ export default function PujaContributions() {
                         <option key={m.membershipId} value={m.userId}>{m.name}</option>
                     ))}
                 </select>
-
-                {/* Right Icon (Custom Arrow) */}
                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
             </div>
         </div>
@@ -145,7 +156,7 @@ export default function PujaContributions() {
 
         <Button 
             type="submit" 
-            className="w-full" 
+            className="w-full bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 border-none"
             isLoading={submitting}
             disabled={!form.userId || !form.amount}
         >
@@ -154,11 +165,7 @@ export default function PujaContributions() {
     </form>
   );
 
-  if (loading) return (
-    <div className="min-h-[60vh] flex items-center justify-center text-primary-600">
-      <Loader2 className="animate-spin w-10 h-10"/>
-    </div>
-  );
+  if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-rose-600"><Loader2 className="animate-spin w-10 h-10"/></div>;
 
   return (
     <div className="space-y-6 pb-24 md:pb-10 animate-fade-in relative">
@@ -167,20 +174,23 @@ export default function PujaContributions() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
            <div className="flex items-center gap-3">
-             <div className="p-2 bg-pink-100 text-pink-600 rounded-lg">
-                <IndianRupee size={24} />
+             <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+                <Sparkles size={24} />
              </div>
-             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Festival Chanda</h1>
+             <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Festival Chanda</h1>
+                <p className="text-slate-500 text-sm font-medium">
+                    Collection for <span className="font-bold text-slate-700">{activeYear?.name || "Active Festival"}</span>
+                </p>
+             </div>
            </div>
-           <p className="text-slate-500 text-sm mt-1 ml-1">
-             Manage collections for <span className="font-bold text-slate-700">{activeYear?.name || "Current Festival"}</span>
-           </p>
         </div>
         
-        <div className="w-full md:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-1 rounded-2xl shadow-lg shadow-emerald-200">
-           <div className="bg-white/10 px-6 py-3 rounded-xl backdrop-blur-sm flex flex-col items-end min-w-[160px]">
-                <span className="text-[10px] font-bold opacity-90 uppercase tracking-wider">Total Collected</span>
-                <span className="text-2xl font-bold font-mono">₹ {pujaTotal.toLocaleString()}</span>
+        {/* TOTAL CARD */}
+        <div className="w-full md:w-auto bg-gradient-to-br from-rose-500 to-pink-600 text-white p-1 rounded-2xl shadow-xl shadow-rose-200">
+           <div className="bg-white/10 px-6 py-4 rounded-xl backdrop-blur-sm flex flex-col items-end min-w-[200px]">
+                <span className="text-[10px] font-bold opacity-90 uppercase tracking-wider mb-1">Total Collected</span>
+                <span className="text-3xl font-bold font-mono tracking-tight">₹{pujaTotal.toLocaleString()}</span>
            </div>
         </div>
       </div>
@@ -190,9 +200,9 @@ export default function PujaContributions() {
         {/* 2. DESKTOP FORM (Sticky) */}
         {activeClub?.role === "admin" && (
           <div className="hidden lg:block lg:col-span-1 sticky top-24">
-            <Card className="shadow-lg shadow-slate-200/50 border-primary-100/50">
+            <Card className="shadow-lg shadow-slate-200/50 border-rose-100/50">
               <div className="flex items-center gap-2 mb-6 text-slate-800 font-bold border-b border-slate-100 pb-4">
-                 <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
+                 <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
                     <Plus size={18} />
                  </div>
                  New Contribution
@@ -204,7 +214,7 @@ export default function PujaContributions() {
 
         {/* 3. TRANSACTION LIST */}
         <div className={activeClub?.role === "admin" ? "lg:col-span-2" : "lg:col-span-3"}>
-           <Card noPadding className="min-h-[500px] flex flex-col">
+           <Card noPadding className="min-h-[500px] flex flex-col border-rose-100">
              
              {/* Toolbar */}
              <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
@@ -213,17 +223,16 @@ export default function PujaContributions() {
                     <input 
                         type="text" 
                         placeholder="Search..." 
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
                 
-                {/* Export Button (Compact on Mobile) */}
                 <Button 
                     variant="secondary" 
                     size="sm"
-                    className="shrink-0"
+                    className="shrink-0 hover:text-rose-600 hover:bg-rose-50"
                     onClick={() => exportPujaPDF({
                         clubName: activeClub?.clubName,
                         cycleName: activeYear?.name,
@@ -258,22 +267,20 @@ export default function PujaContributions() {
                                     <td className="px-4 md:px-6 py-4">
                                         <div className="font-bold text-slate-700">{r.user?.name || "Unknown"}</div>
                                         
-                                        {/* Mobile: Date is shown here */}
                                         <div className="sm:hidden flex items-center gap-1.5 text-xs text-slate-400 mt-1">
                                            <Calendar size={10} />
                                            {new Date(r.createdAt).toLocaleDateString()}
                                         </div>
 
-                                        {r.notes && <div className="text-xs text-slate-400 mt-0.5">{r.notes}</div>}
+                                        {r.notes && <div className="text-xs text-slate-400 mt-0.5 italic">{r.notes}</div>}
                                     </td>
                                     
                                     <td className="px-4 md:px-6 py-4 align-top pt-5">
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-100/50">
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-100">
                                             ₹ {r.amount}
                                         </span>
                                     </td>
                                     
-                                    {/* Desktop: Date Column */}
                                     <td className="px-6 py-4 text-slate-500 hidden sm:table-cell">
                                         <div className="flex items-center gap-2">
                                             <Calendar size={14} className="text-slate-300"/>
@@ -284,7 +291,7 @@ export default function PujaContributions() {
                                     <td className="px-4 md:px-6 py-4 text-right">
                                         {activeClub?.role === "admin" && (
                                             <button 
-                                                onClick={() => deleteRow(r._id)}
+                                                onClick={() => setConfirmDelete({ isOpen: true, id: r._id })}
                                                 className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all md:opacity-0 group-hover:opacity-100"
                                                 title="Delete Record"
                                             >
@@ -306,7 +313,7 @@ export default function PujaContributions() {
       {activeClub?.role === "admin" && (
         <button 
             onClick={() => setShowMobileForm(true)}
-            className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary-600 text-white rounded-full shadow-xl shadow-primary-600/30 flex items-center justify-center z-40 active:scale-90 transition-transform"
+            className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-rose-600 text-white rounded-full shadow-xl shadow-rose-600/30 flex items-center justify-center z-40 active:scale-90 transition-transform hover:bg-rose-700"
         >
             <Plus size={28} />
         </button>
@@ -329,6 +336,16 @@ export default function PujaContributions() {
             </div>
         </div>
       )}
+
+      {/* CONFIRM MODAL */}
+      <ConfirmModal 
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, id: null })}
+        onConfirm={handleDelete}
+        title="Delete Festival Record?"
+        message="This will remove the collected amount from the total. This cannot be undone."
+        isDangerous={true}
+      />
 
     </div>
   );
