@@ -11,6 +11,7 @@ export function exportFinancialReportPDF({
   totalIncome,
   totalExpense,
   netBalance,
+  frequency = "weekly", // ✅ NEW PARAMETER (Default to weekly)
   details = { expenses: [], donations: [], puja: [] } 
 }) {
   const doc = new jsPDF();
@@ -18,7 +19,7 @@ export function exportFinancialReportPDF({
 
   let y = 0;
 
-  // ================= 1. HEADER (Page 1) =================
+  // ================= 1. HEADER =================
   doc.setFillColor(63, 81, 181);
   doc.rect(0, 0, 210, 45, "F");
 
@@ -61,22 +62,33 @@ export function exportFinancialReportPDF({
 
   y += 30;
 
-  // ================= 3. INCOME BREAKDOWN (Summary) =================
+  // ================= 3. INCOME BREAKDOWN (Dynamic) =================
   doc.setFontSize(14); doc.setTextColor(0); doc.setFont(undefined, 'bold');
   doc.text("Income & Expense Summary", 14, y);
   y += 5;
 
-  autoTable(doc, {
-    startY: y,
-    head: [["Category", "Description", "Amount", "Type"]],
-    body: [
-      ["Opening", "Brought forward", formatCurrency(openingBalance), "Asset"],
-      ["Income", "Subscriptions (Weekly/Monthly)", formatCurrency(incomeSources.weekly), "Credit"],
+  // ✅ BUILD ROWS DYNAMICALLY
+  const summaryRows = [
+      ["Opening", "Brought forward", formatCurrency(openingBalance), "Asset"]
+  ];
+
+  // Only add Subscription row if frequency is NOT 'none'
+  if (frequency !== "none") {
+      const label = frequency === "monthly" ? "Subscriptions (Monthly)" : "Subscriptions (Weekly)";
+      summaryRows.push(["Income", label, formatCurrency(incomeSources.weekly), "Credit"]);
+  }
+
+  summaryRows.push(
       ["Income", "Festival Chanda (Member Fees)", formatCurrency(incomeSources.puja), "Credit"],
       ["Income", "Public Donations", formatCurrency(incomeSources.donation), "Credit"],
       ["Expense", "All Expenses", formatCurrency(totalExpense), "Debit"],
       [{ content: "Net Balance", colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } }, { content: formatCurrency(netBalance), styles: { fontStyle: 'bold' } }, "-"]
-    ],
+  );
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Category", "Description", "Amount", "Type"]],
+    body: summaryRows,
     theme: "grid",
     headStyles: { fillColor: [50, 50, 50], textColor: 255 },
     columnStyles: { 2: { halign: "right", fontStyle: "bold" }, 3: { halign: "center" } },
@@ -106,7 +118,7 @@ export function exportFinancialReportPDF({
         body: sortedExpenses.map(e => [
             new Date(e.date).toLocaleDateString(),
             e.title,
-            e.recordedBy?.name || "Member", // ✅ Correct field: recordedBy
+            e.recordedBy?.name || "Member",
             formatCurrency(e.amount)
         ]),
         theme: "striped",
@@ -130,7 +142,7 @@ export function exportFinancialReportPDF({
         head: [["Date", "Member Name", "Notes", "Amount"]],
         body: details.puja.map(p => [
             new Date(p.createdAt).toLocaleDateString(),
-            p.user?.name || "Unknown", // ✅ FIX: Use p.user.name, not p.member.name
+            p.user?.name || "Unknown",
             p.notes || "-",
             formatCurrency(p.amount)
         ]),
@@ -159,7 +171,7 @@ export function exportFinancialReportPDF({
             formatCurrency(d.amount)
         ]),
         theme: "striped",
-        headStyles: { fillColor: [245, 158, 11] }, // Amber
+        headStyles: { fillColor: [245, 158, 11] },
         columnStyles: { 2: { halign: "right", fontStyle: "bold" } }
       });
       y = doc.lastAutoTable.finalY + 15;

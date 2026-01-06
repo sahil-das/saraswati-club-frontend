@@ -1,141 +1,126 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate, Navigate } from "react-router-dom";
-import { Building2, ChevronRight, LogOut } from "lucide-react"; // Make sure to install lucide-react
+import { User, Lock, ArrowRight, LayoutDashboard, Eye, EyeOff, AlertCircle } from "lucide-react";
+
+// Components
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
 
 export default function Login() {
-  const { user, activeClub, login, selectClub, logout } = useAuth();
-  const { register, handleSubmit, formState: { errors } } = useForm();
-  const navigate = useNavigate();
+  const [input, setInput] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   
-  // Local state for the "Select Club" UI
-  const [showClubSelection, setShowClubSelection] = useState(false);
-  const [userClubs, setUserClubs] = useState([]);
+  const { login, selectClub } = useAuth(); 
+  const navigate = useNavigate();
 
-  // 🔒 Redirect: Only if User AND Active Club are set
-  if (user && activeClub) {
-    return <Navigate to="/" replace />;
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  const onSubmit = async (data) => {
     try {
-      const clubs = await login(data.email, data.password);
-      
-      if (clubs.length === 0) {
-        alert("You are not a member of any club.");
-        logout();
-      } else if (clubs.length === 1) {
-        // Only 1 club? Auto-select and go!
-        selectClub(clubs[0]);
-        navigate("/");
-      } else {
-        // Multiple clubs? Show selection screen
-        setUserClubs(clubs);
-        setShowClubSelection(true);
-      }
+      const clubs = await login(input, password);
+      if (clubs && clubs.length === 1) selectClub(clubs[0]);
+      navigate("/");
     } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Invalid credentials");
+      setError("Invalid credentials. Please double-check your ID and password.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClubSelect = (club) => {
-    selectClub(club);
-    navigate("/");
-  };
-
-  // 🌟 RENDER: CLUB SELECTION SCREEN
-  if (showClubSelection) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-indigo-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="text-indigo-600 w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">Select Organization</h2>
-            <p className="text-gray-500">Welcome, {user?.name}</p>
-          </div>
-
-          <div className="space-y-3">
-            {userClubs.map((club) => (
-              <button
-                key={club.clubId}
-                onClick={() => handleClubSelect(club)}
-                className="w-full flex items-center justify-between p-4 border rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition group"
-              >
-                <div className="text-left">
-                  <h3 className="font-semibold text-gray-800">{club.clubName}</h3>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider">{club.role}</p>
-                </div>
-                <ChevronRight className="text-gray-300 group-hover:text-indigo-500" />
-              </button>
-            ))}
-          </div>
-
-          <button 
-            onClick={() => { setShowClubSelection(false); logout(); }}
-            className="mt-6 w-full flex items-center justify-center gap-2 text-gray-400 hover:text-red-500 transition py-2"
-          >
-            <LogOut size={16} />
-            <span>Sign in with different account</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 🌟 RENDER: LOGIN FORM
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-indigo-100">
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md"
-      >
-        <h2 className="text-2xl font-bold text-center text-indigo-600 mb-6">
-          SaaS Club Login
-        </h2>
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-slate-50">
+      
+      {/* BACKGROUND BLOBS */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-200/30 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/30 rounded-full blur-[100px] pointer-events-none" />
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
-            {...register("email", { required: "Email is required" })}
-            className="w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="name@example.com"
-          />
-          {errors.email && (
-            <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-          )}
+      <div className="w-full max-w-md px-4 relative z-10 animate-fade-in">
+        
+        {/* BRANDING */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-lg shadow-slate-200/50 mb-6 ring-1 ring-slate-100">
+             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-inner">
+                <span className="font-bold text-lg tracking-tighter">CK</span>
+             </div>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
+          <p className="text-slate-500 mt-2 text-sm">Enter your System ID to access ClubKhata.</p>
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <input
-            type="password"
-            {...register("password", { required: "Password is required" })}
-            className="w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.password && (
-            <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
-          )}
-        </div>
+        {/* LOGIN CARD */}
+        <Card className="shadow-2xl shadow-slate-200/60 border-slate-100 p-6 md:p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            
+            {error && (
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3 animate-slide-up">
+                <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={18} />
+                <p className="text-sm text-rose-700 font-medium">{error}</p>
+              </div>
+            )}
 
-        <button
-          type="submit"
-          className="w-full bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 transition"
-        >
-          Continue
-        </button>
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            Want to start a new club?{" "}
-            <a href="/register" className="text-indigo-600 font-bold hover:underline">
-              Create Organization
-            </a>
-          </p>
-        </div>
-      </form>
+            <Input 
+              label="System ID or Email"
+              icon={User}
+              placeholder="userid@clubcode.com"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              required
+              className="bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+            />
+
+            <div className="space-y-1">
+              <Input 
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                icon={Lock}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                suffix={
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="hover:text-slate-600 text-slate-400 transition-colors focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                }
+              />
+              <div className="flex justify-end">
+                <button type="button" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
+                  Forgot password?
+                </button>
+              </div>
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full py-3 text-base shadow-lg shadow-indigo-200 hover:shadow-indigo-300" 
+              isLoading={loading}
+              rightIcon={<ArrowRight size={18} />}
+            >
+              Sign In
+            </Button>
+          </form>
+        </Card>
+
+        <p className="text-center mt-8 text-slate-500 text-sm font-medium">
+          New to ClubKhata?{" "}
+          <Link to="/register" className="text-indigo-600 font-bold hover:text-indigo-700 hover:underline transition-all">
+            Resister your club here
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

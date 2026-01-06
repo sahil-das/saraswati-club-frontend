@@ -1,21 +1,22 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
-import { 
-  Bell, Plus, Trash2, Megaphone, Calendar, AlertCircle, X, Loader2 
-} from "lucide-react";
+import { useToast } from "../context/ToastContext"; // 👈 New
+import { Bell, Plus, Trash2, Calendar, Loader2, Megaphone } from "lucide-react";
+import { Card } from "./ui/Card";
+import ConfirmModal from "./ui/ConfirmModal"; // 👈 New
+import AddNoticeModal from "./AddNoticeModal"; // 👈 New
 
 export default function NoticeBoard() {
   const { activeClub } = useAuth();
+  const toast = useToast();
+  
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   
-  // Form State
-  const [formData, setFormData] = useState({ title: "", message: "", type: "info" });
-  const [submitting, setSubmitting] = useState(false);
-
-  const isAdmin = activeClub?.role === "admin";
+  // Modal States
+  const [showAdd, setShowAdd] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => {
     fetchNotices();
@@ -32,148 +33,91 @@ export default function NoticeBoard() {
     }
   };
 
-  const handlePost = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const handleDelete = async () => {
     try {
-      const res = await api.post("/notices", formData);
-      setNotices([res.data.data, ...notices]); // Prepend new notice
-      setShowForm(false);
-      setFormData({ title: "", message: "", type: "info" });
+      await api.delete(`/notices/${deleteId}`);
+      setNotices(prev => prev.filter(n => n._id !== deleteId));
+      toast.success("Notice removed");
     } catch (err) {
-      alert("Failed to post notice");
+      toast.error("Failed to delete notice");
     } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this notice?")) return;
-    try {
-      await api.delete(`/notices/${id}`);
-      setNotices(notices.filter(n => n._id !== id));
-    } catch (err) {
-      alert("Failed to delete");
-    }
-  };
-
-  // Helper for Styles
-  const getTypeStyles = (type) => {
-    switch (type) {
-      case "urgent": return "bg-rose-50 border-rose-100 text-rose-700";
-      case "event": return "bg-purple-50 border-purple-100 text-purple-700";
-      default: return "bg-blue-50 border-blue-100 text-blue-700";
-    }
-  };
-
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case "urgent": return <AlertCircle size={18} />;
-      case "event": return <Calendar size={18} />;
-      default: return <Megaphone size={18} />;
+      setDeleteId(null);
     }
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 h-full flex flex-col">
+    <>
+      <Card className="h-full flex flex-col min-h-[320px] shadow-sm border-slate-200" noPadding>
+         {/* Header */}
+         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+               <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg">
+                  <Megaphone size={16} />
+               </div>
+               Notice Board
+            </h3>
+            {activeClub?.role === "admin" && (
+               <button 
+                  onClick={() => setShowAdd(true)}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg hover:border-amber-500 hover:text-amber-600 transition shadow-sm text-slate-500"
+                  title="Add Notice"
+               >
+                  <Plus size={16} />
+               </button>
+            )}
+         </div>
+
+         {/* Content */}
+         <div className="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar">
+            {loading ? (
+               <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
+                  <Loader2 className="animate-spin" />
+                  <span className="text-xs">Loading updates...</span>
+               </div>
+            ) : notices.length === 0 ? (
+               <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-center">
+                  <Bell className="mb-2 opacity-20" size={32} />
+                  <p className="text-sm font-medium">No new announcements</p>
+                  <p className="text-xs opacity-70">Check back later for updates</p>
+               </div>
+            ) : (
+               notices.map((notice) => (
+                  <div key={notice._id} className="group relative bg-amber-50/40 border border-amber-100/60 p-4 rounded-xl hover:bg-amber-50 transition-colors">
+                     <p className="text-slate-700 text-sm font-medium leading-relaxed pr-6">
+                        {notice.content}
+                     </p>
+                     
+                     <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        <Calendar size={12} /> 
+                        {new Date(notice.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                     </div>
+                     
+                     {activeClub?.role === "admin" && (
+                        <button 
+                          onClick={() => setDeleteId(notice._id)}
+                          className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-red-500 hover:bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          title="Delete Notice"
+                        >
+                           <Trash2 size={14} />
+                        </button>
+                     )}
+                  </div>
+               ))
+            )}
+         </div>
+      </Card>
+
+      {/* Modals */}
+      {showAdd && <AddNoticeModal onClose={() => setShowAdd(false)} refresh={fetchNotices} />}
       
-      {/* HEADER */}
-      <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
-        <h3 className="font-bold text-gray-700 flex items-center gap-2">
-          <Bell className="text-indigo-600" size={20} /> Notice Board
-        </h3>
-        {isAdmin && !showForm && (
-          <button 
-            onClick={() => setShowForm(true)} 
-            className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition flex items-center gap-1"
-          >
-            <Plus size={14} /> New
-          </button>
-        )}
-      </div>
-
-      {/* CREATE FORM (Admin Only) */}
-      {showForm && (
-        <div className="p-4 bg-indigo-50 border-b border-indigo-100 animate-in slide-in-from-top-2">
-           <form onSubmit={handlePost} className="space-y-3">
-              <div className="flex justify-between items-center mb-1">
-                 <h4 className="text-xs font-bold text-indigo-800 uppercase">Post New Notice</h4>
-                 <button type="button" onClick={() => setShowForm(false)} className="text-indigo-400 hover:text-indigo-700"><X size={16}/></button>
-              </div>
-              
-              <input 
-                required 
-                placeholder="Title (e.g., General Meeting)" 
-                className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                value={formData.title}
-                onChange={e => setFormData({...formData, title: e.target.value})}
-              />
-              
-              <textarea 
-                required 
-                placeholder="Message details..." 
-                className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none"
-                value={formData.message}
-                onChange={e => setFormData({...formData, message: e.target.value})}
-              />
-
-              <div className="flex gap-2">
-                 <select 
-                   className="px-3 py-2 rounded-lg border text-sm bg-white outline-none"
-                   value={formData.type}
-                   onChange={e => setFormData({...formData, type: e.target.value})}
-                 >
-                    <option value="info">ℹ️ Info</option>
-                    <option value="event">📅 Event</option>
-                    <option value="urgent">🚨 Urgent</option>
-                 </select>
-                 <button disabled={submitting} className="flex-1 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition">
-                    {submitting ? "Posting..." : "Post Notice"}
-                 </button>
-              </div>
-           </form>
-        </div>
-      )}
-
-      {/* NOTICES LIST */}
-      <div className="p-4 overflow-y-auto max-h-[400px] space-y-3 flex-1">
-        {loading ? (
-           <div className="flex justify-center py-10"><Loader2 className="animate-spin text-gray-400" /></div>
-        ) : notices.length === 0 ? (
-           <div className="text-center py-10 text-gray-400">
-              <p className="text-sm">No new notices.</p>
-           </div>
-        ) : (
-           notices.map(notice => (
-             <div key={notice._id} className={`p-4 rounded-xl border ${getTypeStyles(notice.type)} relative group transition-transform hover:scale-[1.01]`}>
-                
-                {isAdmin && (
-                  <button 
-                    onClick={() => handleDelete(notice._id)}
-                    className="absolute top-3 right-3 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-
-                <div className="flex items-start gap-3">
-                   <div className="mt-1 shrink-0 opacity-80">{getTypeIcon(notice.type)}</div>
-                   <div>
-                      <h4 className="font-bold text-sm leading-tight">{notice.title}</h4>
-                      <p className="text-xs mt-1 opacity-80 whitespace-pre-wrap">{notice.message}</p>
-                      
-                      <div className="flex items-center gap-2 mt-3 text-[10px] opacity-60 font-medium uppercase tracking-wider">
-                         <span>{new Date(notice.createdAt).toLocaleDateString()}</span>
-                         <span>•</span>
-                         <span>{notice.postedBy?.name || "Admin"}</span>
-                      </div>
-                   </div>
-                </div>
-             </div>
-           ))
-        )}
-      </div>
-
-    </div>
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Delete Notice?"
+        message="This will remove the announcement for all members."
+        isDangerous={true}
+      />
+    </>
   );
 }

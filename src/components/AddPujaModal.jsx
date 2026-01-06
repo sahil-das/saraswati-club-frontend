@@ -1,117 +1,111 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import api from "../api/axios";
-import { Loader2, IndianRupee, User, FileText } from "lucide-react";
+import { addFestivalFee } from "../api/festival"; // 👈 API
+import { useToast } from "../context/ToastContext"; // 👈 Toast
+import { X, IndianRupee, User, FileText, Loader2, ChevronDown } from "lucide-react";
+
+// Design System
+import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
 
 export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) {
-  // ✅ Destructure setValue to manually set the ID if pre-selected
   const { register, handleSubmit, setValue } = useForm();
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
+  const toast = useToast();
 
-  // Fetch Members for Dropdown (Only if we need to select one)
   useEffect(() => {
-    if (preSelectedMemberId) {
-      // ✅ If pre-selected (Member Details page), just set the value and skip fetch
-      setValue("userId", preSelectedMemberId);
-    } else {
-      // Otherwise load the list (Global page)
-      const loadMembers = async () => {
+    const loadMembers = async () => {
         try {
-          const res = await api.get("/members");
-          const sorted = (res.data.data || []).sort((a, b) => a.name.localeCompare(b.name));
-          setMembers(sorted);
-        } catch (err) {
-          console.error("Failed to load members", err);
+            const res = await api.get("/members");
+            setMembers(res.data.data);
+            if (preSelectedMemberId) {
+                setValue("userId", preSelectedMemberId);
+            }
+        } catch(err) {
+            console.error(err);
         }
-      };
-      loadMembers();
     }
+    loadMembers();
   }, [preSelectedMemberId, setValue]);
 
   const onSubmit = async (data) => {
-    if (!data.userId) return alert("Please select a member");
-    
     setLoading(true);
     try {
-      await api.post("/member-fees", { 
-        userId: data.userId, 
-        amount: Number(data.amount),
-        notes: data.notes 
-      });
-      if (refresh) refresh();
+      await addFestivalFee({ ...data, amount: Number(data.amount) });
+      toast.success("Festival fee recorded successfully");
+      if(refresh) refresh();
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to add contribution");
+      toast.error(err.response?.data?.message || "Failed to add fee");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
-        <div className="bg-emerald-600 p-6 text-white text-center">
-          <IndianRupee className="w-10 h-10 mx-auto mb-2 opacity-90" />
-          <h2 className="text-xl font-bold">Collect Festival Chanda</h2>
-          <p className="text-emerald-100 text-sm">Record member contribution</p>
+        {/* HEADER: Rose Theme */}
+        <div className="bg-rose-600 px-6 py-4 flex justify-between items-center text-white">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+               <IndianRupee size={20} className="opacity-80"/> Add Festival Fee
+            </h2>
+            <p className="text-rose-100 text-xs">Record extra collection (Chanda)</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-rose-700 rounded-lg transition-colors text-white/80 hover:text-white">
+             <X size={24} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-          
-          {/* ✅ CONDITIONAL: Only show dropdown if NOT pre-selected */}
-          {!preSelectedMemberId && (
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Select Member</label>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
+           
+           <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
               <div className="relative">
-                <User className="absolute left-3 top-3 text-gray-400" size={18} />
-                <select 
-                  {...register("userId", { required: true })} 
-                  className="w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                >
-                  <option value="">Select a member...</option>
-                  {members.map(m => (
-                    <option key={m.userId} value={m.userId}>{m.name}</option>
-                  ))}
-                </select>
+                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                 <select 
+                    {...register("userId", { required: true })}
+                    disabled={!!preSelectedMemberId}
+                    className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                 >
+                    <option value="">Select Member...</option>
+                    {members.map(m => (
+                        <option key={m.userId} value={m.userId}>{m.name}</option>
+                    ))}
+                 </select>
+                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
               </div>
-            </div>
-          )}
+           </div>
 
-          {/* Hidden Input to ensure ID is submitted if field is hidden */}
-          {preSelectedMemberId && <input type="hidden" {...register("userId")} />}
+           <Input 
+              label="Amount (₹)"
+              type="number"
+              icon={IndianRupee}
+              placeholder="e.g. 250"
+              {...register("amount", { required: true })}
+           />
 
-          <div className="grid grid-cols-2 gap-4">
-             <div className="col-span-2">
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Amount (₹)</label>
-                <input 
-                  type="number" 
-                  {...register("amount", { required: true })} 
-                  className="w-full px-4 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-gray-700" 
-                  placeholder="e.g. 500" 
-                />
-             </div>
-          </div>
+           <Input 
+              label="Notes (Optional)"
+              icon={FileText}
+              placeholder="e.g. Late fee / Special Chanda"
+              {...register("notes")}
+           />
 
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Notes (Optional)</label>
-            <div className="relative">
-              <FileText className="absolute left-3 top-2.5 text-gray-400" size={18} />
-              <input 
-                {...register("notes")} 
-                className="w-full pl-10 pr-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" 
-                placeholder="e.g. Cash / GPay" 
-              />
-            </div>
-          </div>
+           <div className="pt-2">
+              <Button 
+                type="submit" 
+                className="w-full bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 border-none"
+                isLoading={loading}
+              >
+                 Record Fee
+              </Button>
+           </div>
 
-          <div className="flex gap-3 pt-4">
-            <button type="button" onClick={onClose} className="flex-1 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-medium transition">Cancel</button>
-            <button type="submit" disabled={loading} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition flex justify-center items-center gap-2">
-              {loading ? <Loader2 className="animate-spin" /> : "Save Record"}
-            </button>
-          </div>
         </form>
       </div>
     </div>

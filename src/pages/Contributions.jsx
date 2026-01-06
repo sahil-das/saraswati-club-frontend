@@ -3,16 +3,13 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useFinance } from "../context/FinanceContext";
 import { 
-  Check, 
-  ChevronDown, 
-  ChevronRight, 
-  AlertCircle,
-  Loader2,
-  FileText,
-  CreditCard,
-  IndianRupee,
-  Lock
+  Check, ChevronDown, ChevronRight, AlertCircle, 
+  CreditCard, IndianRupee, Download, CalendarRange, Lock, RefreshCw 
 } from "lucide-react";
+import { clsx } from "clsx";
+
+// Design System
+import { Button } from "../components/ui/Button";
 import { exportWeeklyAllMembersPDF } from "../utils/exportWeeklyAllMembersPDF";
 
 export default function Contributions() {
@@ -27,92 +24,78 @@ export default function Contributions() {
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-
-        // 1. Get Active Cycle
-        const yearRes = await api.get("/years/active");
-        const activeYear = yearRes.data.data;
-        
-        if (!activeYear) {
-            setLoading(false);
-            return;
-        }
-
-        // Add calculated fields
-        const cycleData = {
-            ...activeYear,
-            subscriptionFrequency: activeYear.subscriptionFrequency || 'weekly',
-            totalInstallments: activeYear.totalInstallments || 52,
-            amountPerInstallment: activeYear.amountPerInstallment || 0
-        };
-        setCycle(cycleData);
-
-        // 2. Get All Members
-        const memberRes = await api.get("/members");
-        const memberList = memberRes.data.data;
-
-        // 3. Fetch Subscriptions
-        const membersWithSubs = await Promise.all(
-          memberList.map(async (m) => {
-            try {
-              const subRes = await api.get(`/subscriptions/member/${m.membershipId}`);
-              return {
-                ...m,
-                subscription: subRes.data.data.subscription, 
-              };
-            } catch (error) {
-              return { ...m, subscription: null };
-            }
-          })
-        );
-
-        setMembers(membersWithSubs);
-      } catch (err) {
-        console.error("Contributions Load Error", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, []);
 
-  /* ================= CALCULATE TOTAL ================= */
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // 1. Get Active Cycle
+      const yearRes = await api.get("/years/active");
+      const activeYear = yearRes.data.data;
+      
+      if (!activeYear) {
+          setLoading(false);
+          return;
+      }
+
+      setCycle({
+          ...activeYear,
+          subscriptionFrequency: activeYear.subscriptionFrequency || 'weekly',
+          totalInstallments: activeYear.totalInstallments || 52,
+          amountPerInstallment: activeYear.amountPerInstallment || 0
+      });
+
+      // 2. Get Members
+      const memberRes = await api.get("/members");
+      const memberList = memberRes.data.data;
+
+      // 3. Fetch subscriptions in parallel
+      const membersWithSubs = await Promise.all(
+        memberList.map(async (m) => {
+          const idToFetch = m.membershipId || m._id; 
+          try {
+            const res = await api.get(`/subscriptions/member/${idToFetch}`);
+            return { ...m, subscription: res.data.data.subscription };
+          } catch (err) {
+            console.error(`Failed to load sub for ${m.name}`, err);
+            return { ...m, subscription: null, error: true };
+          }
+        })
+      );
+
+      setMembers(membersWithSubs);
+    } catch (err) {
+      console.error("Contributions Load Error", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= ACTIONS ================= */
+  
+  // 🚨 FIX: Wrap values in Number() to prevent String Concatenation ("200.00" + "200.00")
   const totalCollected = members.reduce((sum, m) => {
-      return sum + (m.subscription?.totalPaid || 0);
+    return sum + Number(m.subscription?.totalPaid || 0);
   }, 0);
+  
+  const toggleExpand = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  /* ================= HANDLERS ================= */
-  const toggleExpand = (id) =>
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-
-  const handlePayment = async (memberId, subscriptionId, installmentNumber, currentStatus) => {
+  const handlePayment = async (memberId, subscriptionId, installmentNumber) => {
     if (activeClub?.role !== "admin") return;
     if (processing) return;
 
     setProcessing(`${memberId}-${installmentNumber}`);
 
     try {
-      const res = await api.post("/subscriptions/pay", {
-        subscriptionId,
-        installmentNumber
-      });
-
-      // Optimistic UI Update
-      setMembers((prev) =>
-        prev.map((m) => {
-          if (m.membershipId !== memberId) return m; 
-          return {
-            ...m,
-            subscription: res.data.data 
-          };
-        })
-      );
-
+      const res = await api.post("/subscriptions/pay", { subscriptionId, installmentNumber });
+      
+      setMembers((prev) => prev.map((m) => 
+        m.membershipId === memberId ? { ...m, subscription: res.data.data, error: false } : m
+      ));
+      
       fetchCentralFund();
-
     } catch (err) {
       alert("Payment failed: " + (err.response?.data?.message || err.message));
     } finally {
@@ -120,31 +103,39 @@ export default function Contributions() {
     }
   };
 
-  const handleExport = () => {
-      if (!cycle || members.length === 0) return;
-      
-      const exportData = members
-        .filter(m => m.subscription) 
-        .map(m => ({
-            id: m.membershipId,
-            name: m.name,
-            payments: m.subscription.installments
-                .filter(i => i.isPaid)
-                .map(i => ({ week: i.number, date: i.paidDate })) 
-        }));
-
-      exportWeeklyAllMembersPDF({
-          clubName: activeClub?.clubName || "Club Report",
-          members: exportData,
-          totalWeeks: cycle.totalInstallments,
-          weekAmount: cycle.amountPerInstallment
-      });
+  const retrySubscription = async (m) => {
+      const idToFetch = m.membershipId || m._id;
+      try {
+        const res = await api.get(`/subscriptions/member/${idToFetch}`);
+        setMembers(prev => prev.map(curr => 
+            curr._id === m._id ? { ...curr, subscription: res.data.data.subscription, error: false } : curr
+        ));
+      } catch (err) {
+          alert("Retry failed. Check network or backend.");
+      }
   };
 
-  /* ================= HELPERS ================= */
-  const visibleMembers = activeClub?.role === "admin"
-      ? members
-      : members.filter((m) => m.email === user.email);
+  const handleExport = () => {
+    if (!cycle || members.length === 0) return;
+    const exportData = members
+      .filter(m => m.subscription) 
+      .map(m => ({
+          id: m.membershipId,
+          name: m.name,
+          payments: m.subscription.installments.filter(i => i.isPaid).map(i => ({ week: i.number, date: i.paidDate })) 
+      }));
+
+    exportWeeklyAllMembersPDF({
+        clubName: activeClub?.clubName || "Club Report",
+        members: exportData,
+        totalWeeks: cycle.totalInstallments,
+        weekAmount: cycle.amountPerInstallment
+    });
+  };
+
+  const visibleMembers = activeClub?.role === "admin" 
+      ? members 
+      : members.filter(m => m.email === user.email);
 
   const getLabel = (num) => {
     if (cycle?.subscriptionFrequency === 'monthly') {
@@ -155,136 +146,130 @@ export default function Contributions() {
     return `W${num}`;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center text-indigo-600">
-        <Loader2 className="w-10 h-10 animate-spin mb-4" />
-        <p className="text-sm font-medium animate-pulse">Loading Subscriptions...</p>
-      </div>
-    );
-  }
-
-  if (!cycle) {
-    // Admin view - Show alert to create year
-    if (activeClub?.role === "admin") {
-      return (
-        <div className="p-8 text-center bg-red-50 text-red-600 rounded-xl border border-red-100 mt-6">
-          <AlertCircle className="mx-auto mb-2" size={32} />
-          <p className="font-bold text-lg">No Active Financial Year found.</p>
-          <p className="text-sm mt-1">Please create a new festival year in the Dashboard settings.</p>
-        </div>
-      );
-    }
-
-    // Member view - Show locked message
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
-        <div className="bg-gray-100 p-6 rounded-full mb-4">
-          <Lock className="w-12 h-12 text-gray-400" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-700">Financial Year Closed</h2>
-        <p className="text-gray-500 max-w-md mt-2">
-          The committee has closed the accounts for the previous year. 
-          Please wait for the admin to start the new session.
-        </p>
-      </div>
-    );
-  }
+  /* ================= RENDER ================= */
+  if (loading) return <SkeletonLoader />;
+  if (!cycle) return <NoCycleState isAdmin={activeClub?.role === "admin"} />;
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-8 animate-fade-in pb-10">
       
-      {/* 1. HEADER & INFO */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-100 pb-6">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                <CreditCard className="text-indigo-600" /> 
-                {cycle.subscriptionFrequency === 'monthly' ? "Monthly Subscriptions" : "Weekly Subscriptions"}
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">
-                Active Cycle: <span className="font-semibold text-gray-700">{cycle.name}</span>
-            </p>
+           <div className="flex items-center gap-3 mb-2">
+             <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+               <CalendarRange size={24} />
+             </div>
+             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+               {cycle.subscriptionFrequency === 'monthly' ? "Monthly Chanda" : "Weekly Chanda"}
+             </h1>
+           </div>
+           <p className="text-slate-500 text-sm ml-1">
+              Active Cycle: <span className="font-bold text-slate-700">{cycle.name}</span>
+           </p>
         </div>
-        
-        <div className="flex flex-wrap gap-3 items-center">
-             
-             {/* ✅ TOTAL COLLECTED BADGE */}
-             <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm border border-emerald-100 flex items-center gap-2">
-                <IndianRupee size={16} /> Total: {totalCollected.toLocaleString()}
-             </div>
 
-             {/* RATE BADGE */}
-             <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm border border-indigo-100">
-                Rate: ₹{cycle.amountPerInstallment} / {cycle.subscriptionFrequency.slice(0, -2)}
-             </div>
-
-             {/* EXPORT BUTTON */}
+        <div className="flex gap-4 w-full md:w-auto">
+             <StatBadge 
+               label="Collected" 
+               // toLocaleString works correctly on the Number we calculated above
+               value={`₹ ${totalCollected.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
+               icon={IndianRupee} 
+               color="emerald"
+             />
+             <StatBadge 
+               label="Rate" 
+               // Ensure this is also displayed correctly
+               value={`₹ ${Number(cycle.amountPerInstallment).toFixed(0)}`} 
+               sub={`/${cycle.subscriptionFrequency.slice(0, 3)}`}
+               icon={CreditCard} 
+               color="blue"
+             />
              {activeClub?.role === "admin" && (
-                <button 
-                    onClick={handleExport}
-                    className="bg-gray-800 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-700 flex items-center gap-2 shadow-lg shadow-gray-200 transition-all"
-                >
-                    <FileText size={16} /> Export PDF
-                </button>
+                <Button variant="secondary" onClick={handleExport} className="h-auto">
+                   <Download size={18} />
+                </Button>
              )}
         </div>
       </div>
 
-      {/* 2. MEMBER LIST */}
+      {/* MEMBER LIST */}
       <div className="space-y-4">
         {visibleMembers.map((m) => {
-          if (!m.subscription) return null;
+          if (!m.subscription) {
+              return (
+                <div key={m._id} className="bg-white border border-red-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center font-bold">!</div>
+                        <div>
+                            <h3 className="font-bold text-slate-800">{m.name}</h3>
+                            <p className="text-xs text-red-400">Subscription data unavailable</p>
+                        </div>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => retrySubscription(m)}>
+                        <RefreshCw size={14} className="mr-2"/> Retry
+                    </Button>
+                </div>
+              );
+          }
 
           const isOpen = expanded[m.membershipId];
-          const memberTotalPaid = m.subscription.installments.filter(i => i.isPaid).length;
-          const progress = (memberTotalPaid / cycle.totalInstallments) * 100;
-          const isComplete = memberTotalPaid === cycle.totalInstallments;
+          const paidCount = m.subscription.installments.filter(i => i.isPaid).length;
+          const progress = Math.round((paidCount / cycle.totalInstallments) * 100);
+          const isComplete = paidCount === cycle.totalInstallments;
 
           return (
-            <div key={m.membershipId} className={`
-                bg-white rounded-xl shadow-sm border transition-all duration-300
-                ${isComplete ? 'border-emerald-200 bg-emerald-50/10' : 'border-gray-100 hover:border-indigo-200'}
-            `}>
-              
-              {/* Card Header */}
-              <button
+            <div 
+              key={m.membershipId} 
+              className={clsx(
+                "bg-white border rounded-[var(--radius-xl)] transition-all duration-300 overflow-hidden",
+                isComplete ? "border-emerald-200 shadow-sm" : "border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200"
+              )}
+            >
+              {/* MEMBER HEADER ROW */}
+              <div 
                 onClick={() => toggleExpand(m.membershipId)}
-                className="w-full p-5 flex justify-between items-center hover:bg-gray-50 transition-colors rounded-xl"
+                className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors"
               >
                 <div className="flex items-center gap-4">
-                   <div className={`
-                        w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm
-                        ${isComplete ? 'bg-emerald-500' : 'bg-indigo-500'}
-                   `}>
-                        {m.name.charAt(0)}
+                   {/* Progress Circle */}
+                   <div className="relative w-12 h-12 flex items-center justify-center">
+                      <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <path className="text-slate-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                        <path 
+                          className={isComplete ? "text-emerald-500" : "text-indigo-600"} 
+                          strokeDasharray={`${progress}, 100`} 
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="3" 
+                        />
+                      </svg>
+                      <span className="font-bold text-slate-700 text-sm">{m.name.charAt(0)}</span>
                    </div>
                    
-                   <div className="text-left">
-                        <p className="font-bold text-gray-800">{m.name}</p>
-                        <p className="text-xs text-gray-500 font-medium mt-0.5">
-                            Status: 
-                            <span className={`ml-1 ${isComplete ? 'text-emerald-600 font-bold' : 'text-indigo-600'}`}>
-                                {memberTotalPaid} / {cycle.totalInstallments} Paid
-                            </span>
-                        </p>
+                   <div>
+                      <h3 className="font-bold text-slate-800 text-base">{m.name}</h3>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        <span className={isComplete ? "text-emerald-600 font-bold" : "text-indigo-600 font-bold"}>
+                           {paidCount} 
+                        </span>
+                        <span className="text-slate-400"> / {cycle.totalInstallments} paid</span>
+                      </p>
                    </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:block w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-emerald-500' : 'bg-indigo-500'}`} 
-                            style={{ width: `${progress}%` }}
-                        ></div>
-                    </div>
-                    {isOpen ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                <div className="p-2 text-slate-400">
+                    {isOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
                 </div>
-              </button>
+              </div>
 
-              {/* Collapsible Grid */}
+              {/* INSTALLMENT GRID */}
               {isOpen && (
-                <div className="px-5 pb-6 pt-2 border-t border-gray-50 animate-in fade-in slide-in-from-top-1">
-                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                <div className="px-5 pb-6 pt-0 animate-slide-up">
+                    <div className="h-px w-full bg-slate-100 mb-4" />
+                    
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-2">
                         {m.subscription.installments.map((inst) => {
                             const isProcessing = processing === `${m.membershipId}-${inst.number}`;
                             
@@ -292,34 +277,24 @@ export default function Contributions() {
                                 <button
                                     key={inst.number}
                                     disabled={activeClub?.role !== 'admin' || isProcessing}
-                                    onClick={() => handlePayment(m.membershipId, m.subscription._id, inst.number, inst.isPaid)}
-                                    className={`
-                                        relative flex items-center justify-center h-10 rounded-lg border transition-all duration-200
-                                        ${inst.isPaid 
-                                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm hover:bg-emerald-600' 
-                                            : 'bg-white border-gray-200 text-gray-400 hover:border-indigo-300 hover:text-indigo-500'
-                                        }
-                                        ${activeClub?.role !== 'admin' ? 'cursor-default opacity-90' : 'cursor-pointer'}
-                                    `}
-                                    title={inst.isPaid ? `Paid: ${new Date(inst.paidDate).toLocaleDateString()}` : "Unpaid"}
-                                >
-                                    {isProcessing ? (
-                                        <Loader2 size={14} className="animate-spin" />
-                                    ) : inst.isPaid ? (
-                                        <Check size={16} strokeWidth={3} />
-                                    ) : (
-                                        <span className="text-[10px] font-bold">{getLabel(inst.number)}</span>
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePayment(m.membershipId, m.subscription._id, inst.number);
+                                    }}
+                                    className={clsx(
+                                        "h-10 rounded-lg border text-[10px] font-bold transition-all duration-200 flex items-center justify-center relative",
+                                        inst.isPaid 
+                                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
+                                            : "bg-white border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-600",
+                                        isProcessing && "opacity-50 cursor-wait",
+                                        activeClub?.role !== 'admin' && !inst.isPaid && "opacity-50 cursor-not-allowed bg-slate-50"
                                     )}
+                                >
+                                    {inst.isPaid ? <Check size={14} strokeWidth={3} /> : getLabel(inst.number)}
                                 </button>
                             );
                         })}
                     </div>
-                    
-                    {activeClub?.role === 'admin' && (
-                        <p className="text-[10px] text-gray-400 mt-3 text-center italic">
-                            Tap any box to mark as Paid/Unpaid. Changes save instantly.
-                        </p>
-                    )}
                 </div>
               )}
             </div>
@@ -328,4 +303,59 @@ export default function Contributions() {
       </div>
     </div>
   );
+}
+
+// ... Sub-components remain unchanged ...
+function StatBadge({ label, value, sub, icon: Icon, color }) {
+    const colors = {
+        emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
+        blue: "bg-blue-50 text-blue-700 border-blue-100"
+    };
+
+    return (
+        <div className={`flex flex-col items-end px-4 py-2 rounded-xl border ${colors[color]}`}>
+            <div className="flex items-center gap-1 opacity-80 mb-1">
+                <Icon size={12} />
+                <span className="text-[10px] uppercase font-bold tracking-wider">{label}</span>
+            </div>
+            <div className="text-lg font-bold leading-none">
+                {value}<span className="text-xs opacity-70 font-medium">{sub}</span>
+            </div>
+        </div>
+    );
+}
+
+function SkeletonLoader() {
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-end">
+                <div className="space-y-2">
+                    <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+                    <div className="h-4 w-32 bg-slate-100 rounded-lg animate-pulse" />
+                </div>
+                <div className="h-12 w-32 bg-slate-100 rounded-xl animate-pulse" />
+            </div>
+            <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                    <div key={i} className="h-24 w-full bg-white border border-slate-200 rounded-2xl animate-pulse" />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function NoCycleState({ isAdmin }) {
+    return (
+        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
+            <div className="bg-slate-100 p-6 rounded-3xl mb-6 shadow-inner">
+                {isAdmin ? <AlertCircle className="w-12 h-12 text-slate-400" /> : <Lock className="w-12 h-12 text-slate-400" />}
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">Financial Year Not Active</h2>
+            <p className="text-slate-500 max-w-md mt-2 leading-relaxed">
+                {isAdmin 
+                    ? "You haven't started a new financial cycle yet. Go to Settings to configure the new year." 
+                    : "The committee has not opened the books for the new year yet. Please check back later."}
+            </p>
+        </div>
+    );
 }

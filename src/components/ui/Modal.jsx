@@ -1,37 +1,48 @@
-// Modal.jsx
-import React, { useEffect } from "react";
-import clsx from "clsx";
+// src/components/ui/Modal.jsx
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 
-export default function Modal({ open, onClose, title, children }) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-md" }) {
+  // Prevent body scroll when modal is open
   useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") onClose?.();
-    }
-    if (open) {
-      document.addEventListener("keydown", onKey);
+    if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "";
+      document.body.style.overflow = "unset";
     }
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+    return () => (document.body.style.overflow = "unset");
+  }, [isOpen]);
 
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl p-6">
-        <div className="bg-white rounded-2xl p-6 shadow-dropdown">
-          <div className="flex justify-between items-start">
-            <h3 className="text-lg font-semibold">{title}</h3>
-            <button onClick={onClose} className="text-gray-500">✕</button>
-          </div>
-          <div className="mt-4">{children}</div>
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+      />
+
+      {/* Modal Panel */}
+      <div className={`relative w-full ${maxWidth} bg-white rounded-2xl shadow-2xl transform transition-all animate-in fade-in zoom-in-95 duration-200`}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+          <button 
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

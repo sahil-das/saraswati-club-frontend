@@ -1,100 +1,110 @@
 import { useEffect, useState, useMemo } from "react";
-import api from "../api/axios";
+import api from "../api/axios"; // Keep for fetching members/years
+import { fetchFestivalFees, addFestivalFee, deleteFestivalFee } from "../api/festival"; // 👈 New API
 import { useFinance } from "../context/FinanceContext";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext"; // 👈 Toast
+
+// Icons
 import { 
-  Loader2, IndianRupee, User, Plus, Trash2, Calendar, Search, Filter, Download 
+  Loader2, IndianRupee, User, Plus, Trash2, Calendar, 
+  Search, Filter, Download, X, Banknote, ChevronDown, Sparkles 
 } from "lucide-react";
-import { exportPujaPDF } from "../utils/pdfExport"; // ✅ Import Export
+
+// Components
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
+import ConfirmModal from "../components/ui/ConfirmModal"; // 👈 Confirm Modal
+import { exportPujaPDF } from "../utils/pdfExport";
 
 export default function PujaContributions() {
   const { fetchCentralFund, pujaTotal } = useFinance();
   const { activeClub } = useAuth(); 
+  const toast = useToast();
 
   const [members, setMembers] = useState([]);
   const [rows, setRows] = useState([]);
-  const [activeYear, setActiveYear] = useState(null); // ✅ Track Year Name
+  const [activeYear, setActiveYear] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Mobile Form & Delete State
+  const [showMobileForm, setShowMobileForm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
   // Form State
   const [form, setForm] = useState({ userId: "", amount: "", notes: "" });
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    const load = async () => {
+    loadData();
+  }, [activeClub]);
+
+  const loadData = async () => {
       try {
-        // 1. Fetch Basic Data
+        setLoading(true);
         const [mRes, pRes, yearRes] = await Promise.all([
           api.get("/members"),
-          api.get("/member-fees"),
-          api.get("/years/active"), // ✅ Fetch Year Info
+          fetchFestivalFees(), // 👈 Use API
+          api.get("/years/active"),
         ]);
         
-        // Sort members alphabetically
-        const sortedMembers = (mRes.data.data || []).sort((a, b) => 
-          a.name.localeCompare(b.name)
-        );
-
-        setMembers(sortedMembers);
+        setMembers((mRes.data.data || []).sort((a, b) => a.name.localeCompare(b.name)));
         setRows(pRes.data.data || []);
         setActiveYear(yearRes.data.data);
         
         await fetchCentralFund(); 
       } catch (err) {
         console.error("Data load error", err);
+        toast.error("Failed to load festival data");
       } finally {
         setLoading(false);
       }
-    };
-    load();
-  }, []);
+  };
 
   /* ================= HANDLERS ================= */
-  const addContribution = async (e) => {
+  const handleAddContribution = async (e) => {
     e.preventDefault();
-    if (!form.userId || !form.amount) return alert("Please select a member and amount");
+    if (!form.userId || !form.amount) return;
 
     setSubmitting(true);
     try {
-      await api.post("/member-fees", {
+      await addFestivalFee({
         userId: form.userId, 
         amount: Number(form.amount),
         notes: form.notes
       });
-      setForm({ userId: "", amount: "", notes: "" });
       
-      const res = await api.get("/member-fees");
+      toast.success("Festival fee recorded!");
+      setForm({ userId: "", amount: "", notes: "" });
+      setShowMobileForm(false); 
+      
+      // Refresh Data
+      const res = await fetchFestivalFees();
       setRows(res.data.data || []);
       await fetchCentralFund();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to add contribution.");
+      toast.error(err.response?.data?.message || "Failed to add record");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const deleteRow = async (id) => {
-    if(!window.confirm("Delete this record permanently?")) return;
+  const handleDelete = async () => {
     try {
-      await api.delete(`/member-fees/${id}`);
-      setRows(rows.filter(r => r._id !== id));
-      fetchCentralFund();
+      await deleteFestivalFee(confirmDelete.id);
+      setRows(rows.filter(r => r._id !== confirmDelete.id));
+      await fetchCentralFund();
+      toast.success("Record deleted");
     } catch (err) {
-      alert("Failed to delete");
+      toast.error("Failed to delete record");
+    } finally {
+      setConfirmDelete({ isOpen: false, id: null });
     }
   };
 
-  const handleExport = () => {
-    exportPujaPDF({
-      clubName: activeClub?.clubName || activeClub?.name || "Club Committee",
-      cycleName: activeYear?.name,
-      data: filteredRows // Exports filtered view
-    });
-  };
-
-  /* ================= FILTER LOGIC ================= */
   const filteredRows = useMemo(() => {
     return rows.filter(r => 
       (r.user?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,183 +112,241 @@ export default function PujaContributions() {
     );
   }, [rows, searchTerm]);
 
-  if (loading) return (
-    <div className="min-h-[60vh] flex items-center justify-center text-indigo-600">
-      <Loader2 className="animate-spin w-10 h-10"/>
-    </div>
+  /* ================= COMPONENTS ================= */
+  
+  // The Contribution Form (Reusable)
+  const ContributionForm = () => (
+    <form onSubmit={handleAddContribution} className="space-y-4">
+        <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
+            <div className="relative">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                <select
+                    className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all"
+                    value={form.userId}
+                    onChange={(e) => setForm({ ...form, userId: e.target.value })}
+                    required
+                >
+                    <option value="">Select Member...</option>
+                    {members.map((m) => (
+                        <option key={m.membershipId} value={m.userId}>{m.name}</option>
+                    ))}
+                </select>
+                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            </div>
+        </div>
+
+        <Input 
+            label="Amount (₹)"
+            type="number"
+            icon={IndianRupee}
+            placeholder="e.g. 500"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            required
+        />
+
+        <Input 
+            label="Notes (Optional)"
+            icon={Banknote}
+            placeholder="Payment mode, etc."
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+        />
+
+        <Button 
+            type="submit" 
+            className="w-full bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 border-none"
+            isLoading={submitting}
+            disabled={!form.userId || !form.amount}
+        >
+            Record Payment
+        </Button>
+    </form>
   );
 
+  if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-rose-600"><Loader2 className="animate-spin w-10 h-10"/></div>;
+
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6 pb-24 md:pb-10 animate-fade-in relative">
       
       {/* 1. HEADER & STATS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <IndianRupee className="text-indigo-600"/> Festival Chanda
-           </h1>
-           <p className="text-gray-500 text-sm">Manage one-time collections and donations.</p>
-        </div>
-        
-        {/* Total Badge */}
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-emerald-200 flex flex-col items-end">
-           <span className="text-xs font-medium opacity-90 uppercase tracking-wider">Total Collected</span>
-           <span className="text-2xl font-bold">₹ {pujaTotal.toLocaleString()}</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* 2. ADMIN FORM (Sticky Sidebar) */}
-        {activeClub?.role === "admin" && (
-          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-6">
-              <h3 className="font-bold text-gray-800 mb-5 flex items-center gap-2 border-b border-gray-100 pb-3">
-                <Plus size={20} className="text-indigo-600"/> Record Payment
-              </h3>
-              
-              <form onSubmit={addContribution} className="space-y-4">
-                {/* ... (Form Inputs Remain Same) ... */}
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Member</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 text-gray-400" size={16} />
-                    <select
-                      className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
-                      value={form.userId}
-                      onChange={(e) => setForm({ ...form, userId: e.target.value })}
-                    >
-                      <option value="">Select Member...</option>
-                      {members.map((m) => (
-                        <option key={m.membershipId} value={m.userId}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Amount (₹)</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                    value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    placeholder="e.g. 500"
-                  />
-                </div>
-
-                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Notes (Optional)</label>
-                  <input
-                    type="text"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder="e.g. Cash / GPay"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-indigo-600 text-white px-4 py-3.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex justify-center items-center gap-2 active:scale-95"
-                >
-                  {submitting ? <Loader2 className="animate-spin" size={18}/> : "Save Record"}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* 3. HISTORY LIST */}
-        <div className={activeClub?.role === "admin" ? "lg:col-span-2" : "lg:col-span-3"}>
-           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full min-h-[500px]">
-             
-             {/* Toolbar */}
-             <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 flex-1">
-                    <h3 className="font-bold text-gray-700 hidden sm:block whitespace-nowrap">Transactions</h3>
-                    <div className="relative flex-1 max-w-xs">
-                        <Search className="absolute left-3 top-2.5 text-gray-400" size={16}/>
-                        <input 
-                            type="text" 
-                            placeholder="Search member..." 
-                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                </div>
-                
-                {/* ✅ EXPORT BUTTON */}
-                <button 
-                  onClick={handleExport}
-                  className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition border border-gray-200 hover:border-emerald-200 flex items-center gap-2"
-                  title="Download PDF"
-                >
-                   <Download size={18} />
-                   <span className="text-sm font-bold hidden sm:inline">Export</span>
-                </button>
+           <div className="flex items-center gap-3">
+             <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl">
+                <Sparkles size={24} />
              </div>
-
-             {/* Table */}
-             <div className="flex-1 overflow-auto">
-               <div className="min-w-[600px] sm:min-w-full">
-                 {/* Header */}
-                 <div className="grid grid-cols-12 bg-gray-50/50 p-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                    <div className="col-span-5 pl-2">Member</div>
-                    <div className="col-span-3">Amount</div>
-                    <div className="col-span-3">Date</div>
-                    <div className="col-span-1 text-right"></div>
-                 </div>
-
-                 {/* Rows */}
-                 <div className="divide-y divide-gray-50">
-                   {filteredRows.map((r) => (
-                     <div key={r._id} className="p-3 grid grid-cols-12 items-center hover:bg-indigo-50/30 transition-colors group">
-                        
-                        <div className="col-span-5 pl-2">
-                          <p className="font-bold text-gray-700">{r.user?.name || "Unknown"}</p>
-                          {r.notes && <p className="text-xs text-gray-400">{r.notes}</p>}
-                        </div>
-
-                        <div className="col-span-3">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            ₹ {r.amount}
-                          </span>
-                        </div>
-
-                        <div className="col-span-3 text-sm text-gray-500 flex items-center gap-1.5">
-                           <Calendar size={14} className="text-gray-400"/>
-                           {new Date(r.createdAt).toLocaleDateString()}
-                        </div>
-
-                        <div className="col-span-1 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-                           {activeClub?.role === "admin" && (
-                             <button 
-                                onClick={() => deleteRow(r._id)} 
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                             >
-                               <Trash2 size={16} />
-                             </button>
-                           )}
-                        </div>
-                     </div>
-                   ))}
-                 </div>
-               </div>
-
-               {/* Empty State */}
-               {filteredRows.length === 0 && (
-                 <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                    <Filter size={48} className="mb-4 text-gray-200"/>
-                    <p>No records found.</p>
-                 </div>
-               )}
+             <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Festival Chanda</h1>
+                <p className="text-slate-500 text-sm font-medium">
+                    Collection for <span className="font-bold text-slate-700">{activeYear?.name || "Active Festival"}</span>
+                </p>
              </div>
            </div>
         </div>
+        
+        {/* TOTAL CARD */}
+        <div className="w-full md:w-auto bg-gradient-to-br from-rose-500 to-pink-600 text-white p-1 rounded-2xl shadow-xl shadow-rose-200">
+           <div className="bg-white/10 px-6 py-4 rounded-xl backdrop-blur-sm flex flex-col items-end min-w-[200px]">
+                <span className="text-[10px] font-bold opacity-90 uppercase tracking-wider mb-1">Total Collected</span>
+                <span className="text-3xl font-bold font-mono tracking-tight">₹{pujaTotal.toLocaleString()}</span>
+           </div>
+        </div>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        
+        {/* 2. DESKTOP FORM (Sticky) */}
+        {activeClub?.role === "admin" && (
+          <div className="hidden lg:block lg:col-span-1 sticky top-24">
+            <Card className="shadow-lg shadow-slate-200/50 border-rose-100/50">
+              <div className="flex items-center gap-2 mb-6 text-slate-800 font-bold border-b border-slate-100 pb-4">
+                 <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <Plus size={18} />
+                 </div>
+                 New Contribution
+              </div>
+              <ContributionForm />
+            </Card>
+          </div>
+        )}
+
+        {/* 3. TRANSACTION LIST */}
+        <div className={activeClub?.role === "admin" ? "lg:col-span-2" : "lg:col-span-3"}>
+           <Card noPadding className="min-h-[500px] flex flex-col border-rose-100">
+             
+             {/* Toolbar */}
+             <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+                    <input 
+                        type="text" 
+                        placeholder="Search..." 
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                
+                <Button 
+                    variant="secondary" 
+                    size="sm"
+                    className="shrink-0 hover:text-rose-600 hover:bg-rose-50"
+                    onClick={() => exportPujaPDF({
+                        clubName: activeClub?.clubName,
+                        cycleName: activeYear?.name,
+                        data: filteredRows
+                    })}
+                >
+                    <Download size={18} />
+                    <span className="hidden sm:inline ml-2">Export</span>
+                </Button>
+             </div>
+
+             {/* Table Content */}
+             <div className="flex-1 overflow-auto">
+                {filteredRows.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                        <Filter size={48} className="mb-4 opacity-20"/>
+                        <p className="text-sm font-medium">No transactions found</p>
+                    </div>
+                ) : (
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50 sticky top-0 z-10 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <tr>
+                                <th className="px-4 md:px-6 py-4 border-b border-slate-200">Member</th>
+                                <th className="px-4 md:px-6 py-4 border-b border-slate-200">Amount</th>
+                                <th className="px-6 py-4 border-b border-slate-200 hidden sm:table-cell">Date</th>
+                                <th className="px-4 md:px-6 py-4 border-b border-slate-200 text-right"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-sm">
+                            {filteredRows.map((r) => (
+                                <tr key={r._id} className="group hover:bg-slate-50/80 transition-colors">
+                                    <td className="px-4 md:px-6 py-4">
+                                        <div className="font-bold text-slate-700">{r.user?.name || "Unknown"}</div>
+                                        
+                                        <div className="sm:hidden flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+                                           <Calendar size={10} />
+                                           {new Date(r.createdAt).toLocaleDateString()}
+                                        </div>
+
+                                        {r.notes && <div className="text-xs text-slate-400 mt-0.5 italic">{r.notes}</div>}
+                                    </td>
+                                    
+                                    <td className="px-4 md:px-6 py-4 align-top pt-5">
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-100">
+                                            ₹ {r.amount}
+                                        </span>
+                                    </td>
+                                    
+                                    <td className="px-6 py-4 text-slate-500 hidden sm:table-cell">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar size={14} className="text-slate-300"/>
+                                            {new Date(r.createdAt).toLocaleDateString()}
+                                        </div>
+                                    </td>
+                                    
+                                    <td className="px-4 md:px-6 py-4 text-right">
+                                        {activeClub?.role === "admin" && (
+                                            <button 
+                                                onClick={() => setConfirmDelete({ isOpen: true, id: r._id })}
+                                                className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all md:opacity-0 group-hover:opacity-100"
+                                                title="Delete Record"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+             </div>
+           </Card>
+        </div>
+      </div>
+
+      {/* 4. MOBILE FAB */}
+      {activeClub?.role === "admin" && (
+        <button 
+            onClick={() => setShowMobileForm(true)}
+            className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-rose-600 text-white rounded-full shadow-xl shadow-rose-600/30 flex items-center justify-center z-40 active:scale-90 transition-transform hover:bg-rose-700"
+        >
+            <Plus size={28} />
+        </button>
+      )}
+
+      {/* 5. MOBILE FORM DRAWER */}
+      {showMobileForm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center lg:hidden">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowMobileForm(false)} />
+            <div className="bg-white w-full rounded-t-2xl p-6 relative animate-slide-up shadow-2xl">
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800">Record Contribution</h3>
+                    <button onClick={() => setShowMobileForm(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+                        <X size={20} />
+                    </button>
+                </div>
+                <ContributionForm />
+                <div className="h-4" /> 
+            </div>
+        </div>
+      )}
+
+      {/* CONFIRM MODAL */}
+      <ConfirmModal 
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, id: null })}
+        onConfirm={handleDelete}
+        title="Delete Festival Record?"
+        message="This will remove the collected amount from the total. This cannot be undone."
+        isDangerous={true}
+      />
+
     </div>
   );
 }

@@ -1,15 +1,42 @@
-import { useEffect, useState } from "react";
-import { IndianRupee, ChevronDown, ChevronRight, Calendar, Filter } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { 
+  IndianRupee, Calendar, Filter, Search, ArrowUpRight, 
+  TrendingUp, ChevronDown, ChevronRight 
+} from "lucide-react";
 import { useFinance } from "../context/FinanceContext";
 import api from "../api/axios";
+import { clsx } from "clsx";
+
+// Design System
+import { Card } from "../components/ui/Card";
+
+// 🛠 HELPER: Safe Currency Parser
+const parseAmount = (val) => {
+    if (!val) return 0;
+    // If backend returns number (20000), it's Paisa -> Divide
+    if (typeof val === 'number') {
+        // Simple heuristic: If it's a huge integer, assume Paisa.
+        // Or better: Assuming your Finance Context sends raw paisa for totals
+        // You might need to check how FinanceContext calculates these.
+        // If FinanceContext sums up strings "50.00", this logic changes.
+        
+        // Safest approach if you are seeing 20000:
+        return val / 100;
+    }
+    // If backend returns string "200.00", it's Rupees -> Parse
+    return Number(val) || 0;
+};
 
 export default function CollectionsOverview() {
   const { weeklyTotal, pujaTotal, donationTotal, loading: financeLoading } = useFinance();
-
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Collapsible State
+  const [openDates, setOpenDates] = useState({});
 
-  /* ===== LOAD DONATIONS ===== */
+  /* ===== LOAD DATA ===== */
   useEffect(() => {
     const loadDonations = async () => {
       try {
@@ -21,199 +48,264 @@ export default function CollectionsOverview() {
         setLoading(false);
       }
     };
-
     loadDonations();
   }, []);
 
-  const totalCollection = weeklyTotal + pujaTotal + donationTotal;
+  // 🚨 FIX: Parse all inputs before summing
+  const parsedWeekly = parseAmount(weeklyTotal);
+  const parsedPuja = parseAmount(pujaTotal);
+  const parsedDonation = parseAmount(donationTotal);
+  
+  const totalCollection = parsedWeekly + parsedPuja + parsedDonation;
 
-  /* ===== GROUP DONATIONS BY DATE ===== */
-  // Sort by date descending (Newest first)
-  const sortedDonations = [...donations].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+  /* ===== GROUP & FILTER ===== */
+  const filteredDonations = useMemo(() => {
+    return donations.filter(d => 
+      (d.donorName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.amount.toString()).includes(searchTerm)
+    );
+  }, [donations, searchTerm]);
 
-  const donationsByDate = sortedDonations.reduce((acc, d) => {
-    const date = new Date(d.date || d.createdAt).toLocaleDateString("en-IN", { 
-      day: 'numeric', month: 'short', year: 'numeric' 
-    });
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(d);
-    return acc;
-  }, {});
+  // Group by Date (Desc)
+  const groupedData = useMemo(() => {
+    const sorted = [...filteredDonations].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+    
+    return sorted.reduce((acc, d) => {
+      const date = new Date(d.date || d.createdAt).toLocaleDateString("en-IN", { 
+        day: 'numeric', month: 'short', year: 'numeric' 
+      });
+      if (!acc[date]) acc[date] = [];
+      acc[date].push(d);
+      return acc;
+    }, {});
+  }, [filteredDonations]);
 
-  /* ===== COLLAPSE STATE ===== */
-  const [openDates, setOpenDates] = useState({});
-
+  // Toggle Handler
   const toggleDate = (date) => {
-    setOpenDates((prev) => ({
-      ...prev,
-      [date]: !prev[date],
-    }));
+    setOpenDates(prev => ({ ...prev, [date]: !prev[date] }));
   };
 
+  // Auto-expand first date on load
+  useEffect(() => {
+    const dates = Object.keys(groupedData);
+    if (dates.length > 0 && Object.keys(openDates).length === 0) {
+        setOpenDates({ [dates[0]]: true });
+    }
+  }, [groupedData]);
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-10 animate-fade-in">
+    <div className="space-y-8 pb-10 animate-fade-in">
       
-      {/* ================= HEADER ================= */}
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-emerald-100 text-emerald-700 rounded-xl">
-           <IndianRupee size={28} />
-        </div>
+      {/* 1. HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Collections Overview</h2>
-          <p className="text-sm text-gray-500">Breakdown of all incoming funds.</p>
+           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+             <IndianRupee className="text-primary-600" /> Financial Overview
+           </h1>
+           <p className="text-slate-500 text-sm mt-1">Real-time breakdown of all club funds.</p>
         </div>
       </div>
 
-      {/* ================= SUMMARY CARDS ================= */}
+      {/* 2. STATS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard 
-          label="Weekly Subs" 
-          value={weeklyTotal} 
+          label="Weekly Chanda" 
+          value={parsedWeekly} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
-          color="bg-blue-50 border-blue-100 text-blue-700"
+          color="blue"
+          icon={Calendar}
         />
         <SummaryCard 
-          label="Puja Chanda" 
-          value={pujaTotal} 
+          label="Festival Chanda" 
+          value={parsedPuja} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
-          color="bg-purple-50 border-purple-100 text-purple-700"
+          color="pink"
+          icon={IndianRupee}
         />
         <SummaryCard 
           label="Donations" 
-          value={donationTotal} 
+          value={parsedDonation} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
-          color="bg-amber-50 border-amber-100 text-amber-700"
+          color="amber"
+          icon={TrendingUp}
         />
         <SummaryCard
-          label="Total Collected"
-          value={totalCollection}
+          label="Grand Total"
+          value={totalCollection} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           highlight
+          icon={ArrowUpRight}
         />
       </div>
 
-      {/* ================= DONATION LEDGER ================= */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="font-bold text-gray-700 flex items-center gap-2">
-                <Calendar size={18} className="text-indigo-500"/> Donation Ledger
-            </h3>
-            <span className="text-xs font-bold px-2 py-1 bg-gray-100 text-gray-500 rounded-md">
-                {donations.length} Records
-            </span>
-        </div>
-
-        <div className="p-6 bg-gray-50/50 min-h-[300px]">
-            {loading && (
-            <p className="text-center py-10 text-gray-400">Loading records...</p>
-            )}
-
-            {!loading && donations.length === 0 && (
-            <div className="text-center py-10 flex flex-col items-center">
-                <Filter size={40} className="text-gray-300 mb-2" />
-                <p className="text-gray-500 font-medium">No outside donations recorded yet.</p>
-            </div>
-            )}
-
-            <div className="space-y-3">
-            {Object.entries(donationsByDate).map(([date, list]) => {
-                const dateTotal = list.reduce((sum, d) => sum + d.amount, 0);
-                const isOpen = openDates[date];
-
-                return (
-                <div key={date} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md">
-                    {/* DATE HEADER */}
-                    <button
-                    onClick={() => toggleDate(date)}
-                    className="w-full flex justify-between items-center px-5 py-4 bg-white hover:bg-gray-50 transition-colors"
-                    >
-                    <div className="flex items-center gap-3">
-                        <div className={`p-1 rounded-full ${isOpen ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'}`}>
-                            {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </div>
-                        <span className="font-bold text-gray-700">{date}</span>
-                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{list.length}</span>
-                    </div>
-
-                    <span className="font-mono font-bold text-emerald-600">
-                        + ₹{dateTotal.toLocaleString()}
-                    </span>
-                    </button>
-
-                    {/* EXPANDED LIST */}
-                    {isOpen && (
-                    <div className="border-t border-gray-100">
-                        {list.map((d, index) => (
-                        <div
-                            key={d._id || index}
-                            className="flex justify-between items-center px-5 py-3 text-sm hover:bg-gray-50 border-b last:border-0 border-gray-50"
-                        >
-                            <div className="flex flex-col">
-                                <span className="font-medium text-gray-800">
-                                {d.donorName || "Unknown Donor"}
-                                </span>
-                                {d.receiptNo && (
-                                    <span className="text-[10px] text-gray-400">Receipt: {d.receiptNo}</span>
-                                )}
-                            </div>
-
-                            <div className="text-right">
-                                <span className="font-medium text-gray-700 block">
-                                    ₹{d.amount.toLocaleString()}
-                                </span>
-                                <span className="text-[10px] text-gray-400">
-                                    Via: {d.paymentMethod || "Cash"}
-                                </span>
-                            </div>
-                        </div>
-                        ))}
-                    </div>
-                    )}
+      {/* 3. TIMELINE LEDGER */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Main Timeline */}
+        <div className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-800 text-lg">Transaction History</h3>
+                
+                {/* Search Pill */}
+                <div className="relative group">
+                    <Search className="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Search records..." 
+                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-full text-sm focus:ring-2 focus:ring-primary-100 outline-none w-32 focus:w-64 transition-all shadow-sm"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                 </div>
-                );
-            })}
+            </div>
+
+            {/* Empty State */}
+            {!loading && Object.keys(groupedData).length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 bg-white border border-slate-100 rounded-2xl border-dashed">
+                    <Filter className="text-slate-200 mb-2" size={48} />
+                    <p className="text-slate-400 font-medium">No transactions found</p>
+                </div>
+            )}
+
+            {/* Timeline Stream */}
+            <div className="relative border-l-2 border-slate-200 ml-2 md:ml-4 space-y-6 pb-4">
+                {Object.entries(groupedData).map(([date, items], index) => {
+                    const isOpen = openDates[date];
+                    
+                    return (
+                        <div key={date} className="relative pl-6 md:pl-8 animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+                            
+                            {/* Interactive Timeline Dot */}
+                            <button 
+                                onClick={() => toggleDate(date)}
+                                className={clsx(
+                                    "absolute -left-[9px] top-1 w-5 h-5 rounded-full border-4 flex items-center justify-center transition-all z-10",
+                                    isOpen 
+                                        ? "bg-white border-primary-500 ring-2 ring-primary-100 scale-110" 
+                                        : "bg-slate-200 border-slate-50 hover:bg-primary-200 hover:border-primary-300"
+                                )}
+                            >
+                                {/* Small dot inside */}
+                                <div className={clsx("w-1.5 h-1.5 rounded-full", isOpen ? "bg-primary-500" : "hidden")} />
+                            </button>
+                            
+                            {/* Date Header (Clickable) */}
+                            <button 
+                                onClick={() => toggleDate(date)}
+                                className="w-full flex items-center justify-between group mb-3 hover:bg-slate-50 p-2 rounded-lg -ml-2 transition-colors"
+                            >
+                                <div className="flex items-baseline gap-3">
+                                    <h4 className="font-bold text-slate-700 text-lg">{date.split(" ")[0]} <span className="text-sm font-normal text-slate-500">{date.split(" ").slice(1).join(" ")}</span></h4>
+                                    <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                                        {items.length} txn
+                                    </span>
+                                </div>
+                                <div className="text-slate-400 group-hover:text-primary-500 transition-colors">
+                                    {isOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                </div>
+                            </button>
+
+                            {/* Cards for this Date */}
+                            {isOpen && (
+                                <div className="space-y-3 animate-fade-in">
+                                    {items.map((d) => (
+                                        <div key={d._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                                    {d.donorName ? d.donorName.charAt(0) : "?"}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-slate-800 text-sm group-hover:text-primary-700 transition-colors truncate">
+                                                        {d.donorName || "Anonymous"}
+                                                    </p>
+                                                    <p className="text-xs text-slate-400 capitalize truncate">
+                                                        {d.paymentMethod || "Cash"} {d.receiptNo && `• Ref: ${d.receiptNo}`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0 ml-2">
+                                                {/* 🚨 FIX: Parse amount before display */}
+                                                <p className="font-bold text-slate-800 text-sm">+ ₹{Number(d.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                                                <p className="text-[10px] text-slate-400">Donation</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
+
+        {/* Info Sidebar */}
+        <div className="hidden lg:block space-y-6">
+            <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
+                <h3 className="font-bold text-lg mb-2">Fund Distribution</h3>
+                <p className="text-slate-400 text-sm mb-6">How current funds are allocated across categories.</p>
+                
+                <div className="space-y-4">
+                    <DistributionBar label="Subscriptions" amount={parsedWeekly} total={totalCollection} color="bg-blue-500" />
+                    <DistributionBar label="Festival" amount={parsedPuja} total={totalCollection} color="bg-pink-500" />
+                    <DistributionBar label="Donations" amount={parsedDonation} total={totalCollection} color="bg-amber-500" />
+                </div>
+            </Card>
+        </div>
+
       </div>
     </div>
   );
 }
 
-/* ================= COMPONENT ================= */
+/* ===== SUB COMPONENTS ===== */
 
-function SummaryCard({ label, value, highlight, loading, color }) {
-  return (
-    <div
-      className={`rounded-2xl p-5 flex items-center gap-4 border transition-transform hover:-translate-y-1 ${
-        highlight 
-            ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200" 
-            : `${color || 'bg-white border-gray-100'} shadow-sm`
-      }`}
-    >
+function SummaryCard({ label, value, loading, highlight, color, icon: Icon }) {
+    const colors = {
+        blue: "bg-blue-50 text-blue-700 border-blue-100",
+        pink: "bg-pink-50 text-pink-700 border-pink-100",
+        amber: "bg-amber-50 text-amber-700 border-amber-100",
+    };
+
+    return (
       <div
-        className={`p-3 rounded-xl ${
-          highlight
-            ? "bg-white/20 text-white"
-            : "bg-white border border-gray-100 text-gray-600 shadow-sm"
-        }`}
+        className={clsx(
+            "rounded-2xl p-5 flex flex-col justify-between border min-h-[110px] transition-all hover:-translate-y-1",
+            highlight 
+                ? "bg-primary-600 text-white border-primary-600 shadow-xl shadow-primary-200" 
+                : `${colors[color]} shadow-sm`
+        )}
       >
-        <IndianRupee size={20} />
-      </div>
-
-      <div>
-        <p className={`text-xs font-bold uppercase tracking-wider ${
-            highlight ? "opacity-80" : "opacity-60"
-        }`}>
-          {label}
-        </p>
+        <div className="flex justify-between items-start">
+            <p className={clsx("text-xs font-bold uppercase tracking-wider", highlight ? "opacity-80" : "opacity-60")}>
+                {label}
+            </p>
+            {Icon && <Icon size={18} className={highlight ? "opacity-100" : "opacity-50"} />}
+        </div>
+  
         {loading ? (
-             <div className="h-6 w-24 bg-current opacity-20 rounded animate-pulse mt-1"></div>
+           <div className="h-8 w-24 bg-current opacity-20 rounded animate-pulse" />
         ) : (
-            <h3 className="text-2xl font-bold font-mono">
-             ₹{value.toLocaleString()}
-            </h3>
+           <h3 className="text-3xl font-bold font-mono tracking-tight">
+             {/* 🚨 FIX: Ensure value is parsed before display */}
+             ₹{(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
+           </h3>
         )}
       </div>
-    </div>
-  );
+    );
+}
+
+function DistributionBar({ label, amount, total, color }) {
+    const percentage = total > 0 ? Math.round((amount / total) * 100) : 0;
+    
+    return (
+        <div>
+            <div className="flex justify-between text-xs font-medium mb-1">
+                <span className="text-slate-300">{label}</span>
+                <span>{percentage}%</span>
+            </div>
+            <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
+                <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${percentage}%` }} />
+            </div>
+        </div>
+    );
 }
