@@ -16,6 +16,17 @@ import { Card } from "../components/ui/Card";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import AddPujaModal from "../components/AddPujaModal"; 
 
+// 🛠 HELPER: Handle both Paisa Integers (20000) and Rupee Strings ("200.00")
+const parseAmount = (val) => {
+    if (!val) return 0;
+    // If backend returns number (20000), it's Paisa -> Divide
+    if (typeof val === 'number') {
+        return val / 100;
+    }
+    // If backend returns string "200.00", it's Rupees -> Parse
+    return Number(val) || 0;
+};
+
 export default function MemberDetails() {
   const { memberId } = useParams();
   const navigate = useNavigate();
@@ -23,7 +34,7 @@ export default function MemberDetails() {
   const toast = useToast();
   
   const [loading, setLoading] = useState(true);
-  const [isYearClosed, setIsYearClosed] = useState(false); // 👈 New State
+  const [isYearClosed, setIsYearClosed] = useState(false);
   
   const [member, setMember] = useState(null);
   const [subscription, setSubscription] = useState(null);
@@ -31,7 +42,6 @@ export default function MemberDetails() {
   const [chandaHistory, setChandaHistory] = useState([]);
   const [stats, setStats] = useState({ subPaid: 0, subDue: 0, chandaPaid: 0 });
   
-  // Modals
   const [showChandaModal, setShowChandaModal] = useState(false);
   const [confirmPayment, setConfirmPayment] = useState({ isOpen: false, inst: null });
 
@@ -42,17 +52,11 @@ export default function MemberDetails() {
     try {
       setLoading(true);
 
-      // 1. CHECK ACTIVE YEAR FIRST
+      // 1. CHECK ACTIVE YEAR
       try {
         const yearRes = await api.get("/years/active");
         if (!yearRes.data.data) {
            setIsYearClosed(true);
-           // If year is closed, we only try to fetch basic member info
-           // We assume a separate endpoint or error handling for this, 
-           // but here we try to get basic details from the subscription endpoint 
-           // which might return 404 if logic is strict. 
-           // Ideally you'd have a /members/:id endpoint.
-           // For now, let's try to fetch and handle the error gracefully.
         }
       } catch (e) {
          setIsYearClosed(true);
@@ -75,17 +79,18 @@ export default function MemberDetails() {
       setSubscription(data.subscription);
       setFrequency(data.rules?.frequency || "weekly");
 
-      // 3. Fetch Puja Fees (Only if year is open)
+      // 3. Fetch Puja Fees
       if (!isYearClosed) {
         try {
             const userIdToFetch = data.memberUserId || data.member?.userId;
             const feeRes = await api.get(`/member-fees/member/${userIdToFetch}`);
             setChandaHistory(feeRes.data.data.records || []);
             
+            // 🚨 FIX: Parse all amounts before setting state
             setStats({
-            subPaid: data.subscription?.totalPaid || 0,
-            subDue: data.subscription?.totalDue || 0,
-            chandaPaid: feeRes.data.data.total || 0
+              subPaid: parseAmount(data.subscription?.totalPaid),
+              subDue: parseAmount(data.subscription?.totalDue),
+              chandaPaid: parseAmount(feeRes.data.data.total)
             });
         } catch (e) {
             console.warn("Chanda fetch failed", e);
@@ -94,11 +99,7 @@ export default function MemberDetails() {
 
     } catch (err) {
       console.error("Member Details Error:", err);
-      // If the error is because no subscription exists (Year Closed), we might still want to show basic member info if possible.
-      // But usually, we just show the error or redirect.
-      if (isYearClosed) {
-         // If we already know year is closed, ignore subscription fetch errors
-      } else {
+      if (!isYearClosed) {
          toast.error("Failed to load member data");
       }
     } finally {
@@ -119,7 +120,14 @@ export default function MemberDetails() {
         installmentNumber: inst.number
       });
       setSubscription(res.data.data);
-      setStats(prev => ({ ...prev, subPaid: res.data.data.totalPaid, subDue: res.data.data.totalDue }));
+      
+      // 🚨 FIX: Parse response amounts
+      setStats(prev => ({ 
+          ...prev, 
+          subPaid: parseAmount(res.data.data.totalPaid), 
+          subDue: parseAmount(res.data.data.totalDue) 
+      }));
+      
       toast.success("Payment status updated");
     } catch (err) {
       toast.error(err.response?.data?.message || "Update failed");
@@ -192,7 +200,7 @@ export default function MemberDetails() {
                 </div>
              </div>
 
-             {/* Actions - HIDDEN IF YEAR CLOSED */}
+             {/* Actions */}
              <div className="flex gap-3 w-full md:w-auto mt-4 md:mt-0">
                  {!isYearClosed && activeClub?.role === "admin" && (
                     <Button onClick={() => setShowChandaModal(true)} leftIcon={<Plus size={18} />} className="shadow-lg shadow-indigo-200 w-full md:w-auto">
@@ -205,7 +213,6 @@ export default function MemberDetails() {
 
       {/* 3. MAIN CONTENT */}
       {isYearClosed ? (
-        // --- YEAR CLOSED STATE ---
         <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm ring-4 ring-slate-100">
               <Lock className="w-8 h-8 text-slate-400" />
@@ -222,7 +229,6 @@ export default function MemberDetails() {
            )}
         </div>
       ) : (
-        // --- NORMAL OPEN STATE ---
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* LEFT COLUMN: SUBSCRIPTION */}
@@ -235,7 +241,7 @@ export default function MemberDetails() {
                         <CreditCard className="text-indigo-600" size={20} /> Subscription Status
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">
-                            {frequency === 'monthly' ? 'Monthly' : 'Weekly'} Plan • <span className="font-bold text-slate-700">₹{subscription?.year?.amountPerInstallment}</span> / period
+                            {frequency === 'monthly' ? 'Monthly' : 'Weekly'} Plan • <span className="font-bold text-slate-700">₹{parseAmount(subscription?.year?.amountPerInstallment)}</span> / period
                         </p>
                     </div>
                     <div className="text-right">
@@ -281,6 +287,7 @@ export default function MemberDetails() {
                 <div className="grid grid-cols-2 gap-4">
                     <Card noPadding className="bg-white border-slate-200 p-4">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Paid</p>
+                        {/* 🚨 FIX: toLocaleString on number */}
                         <p className="text-xl font-bold text-emerald-600 font-mono">₹{totalContribution.toLocaleString()}</p>
                     </Card>
                     {frequency !== 'none' && (
@@ -312,7 +319,8 @@ export default function MemberDetails() {
                                         <p className="text-sm font-bold text-slate-700">Festival Payment</p>
                                         <p className="text-[10px] text-slate-400">{new Date(fee.createdAt).toLocaleDateString()}</p>
                                     </div>
-                                    <span className="text-sm font-bold font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">+ ₹{fee.amount}</span>
+                                    {/* 🚨 FIX: Parse individual fee amount */}
+                                    <span className="text-sm font-bold font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">+ ₹{parseAmount(fee.amount)}</span>
                                 </div>
                                 {fee.notes && <p className="text-xs text-slate-400 mt-1 italic">"{fee.notes}"</p>}
                             </div>
@@ -321,7 +329,6 @@ export default function MemberDetails() {
                     )}
                 </Card>
 
-                {/* CONTACT CARD */}
                 <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-lg">
                     <div className="flex items-center gap-4 mb-4">
                         <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
@@ -341,12 +348,10 @@ export default function MemberDetails() {
         </div>
       )}
 
-      {/* MODALS */}
       {showChandaModal && !isYearClosed && (
          <AddPujaModal onClose={() => setShowChandaModal(false)} refresh={fetchData} preSelectedMemberId={member.clubId} />
       )}
 
-      {/* PAYMENT CONFIRMATION */}
       <ConfirmModal 
         isOpen={confirmPayment.isOpen}
         onClose={() => setConfirmPayment({ isOpen: false, inst: null })}

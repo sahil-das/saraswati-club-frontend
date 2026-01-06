@@ -109,7 +109,7 @@ export default function Expenses() {
 
   const totalApproved = expenses
     .filter(e => e.status === "approved")
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((sum, e) => sum + Number(e.amount), 0);
 
   if (loading) return <LoadingState />;
   if (!cycle) return <NoCycleState isAdmin={activeClub?.role === "admin"} />;

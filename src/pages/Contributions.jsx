@@ -54,7 +54,6 @@ export default function Contributions() {
       // 3. Fetch subscriptions in parallel
       const membersWithSubs = await Promise.all(
         memberList.map(async (m) => {
-          // Use _id as fallback if membershipId is missing
           const idToFetch = m.membershipId || m._id; 
           try {
             const res = await api.get(`/subscriptions/member/${idToFetch}`);
@@ -75,7 +74,11 @@ export default function Contributions() {
   };
 
   /* ================= ACTIONS ================= */
-  const totalCollected = members.reduce((sum, m) => sum + (m.subscription?.totalPaid || 0), 0);
+  
+  // 🚨 FIX: Wrap values in Number() to prevent String Concatenation ("200.00" + "200.00")
+  const totalCollected = members.reduce((sum, m) => {
+    return sum + Number(m.subscription?.totalPaid || 0);
+  }, 0);
   
   const toggleExpand = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -169,13 +172,15 @@ export default function Contributions() {
         <div className="flex gap-4 w-full md:w-auto">
              <StatBadge 
                label="Collected" 
-               value={`₹ ${totalCollected.toLocaleString()}`} 
+               // toLocaleString works correctly on the Number we calculated above
+               value={`₹ ${totalCollected.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
                icon={IndianRupee} 
                color="emerald"
              />
              <StatBadge 
                label="Rate" 
-               value={`₹ ${cycle.amountPerInstallment}`} 
+               // Ensure this is also displayed correctly
+               value={`₹ ${Number(cycle.amountPerInstallment).toFixed(0)}`} 
                sub={`/${cycle.subscriptionFrequency.slice(0, 3)}`}
                icon={CreditCard} 
                color="blue"
@@ -191,14 +196,11 @@ export default function Contributions() {
       {/* MEMBER LIST */}
       <div className="space-y-4">
         {visibleMembers.map((m) => {
-          // Fallback if subscription failed to load
           if (!m.subscription) {
               return (
                 <div key={m._id} className="bg-white border border-red-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center font-bold">
-                            !
-                        </div>
+                        <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center font-bold">!</div>
                         <div>
                             <h3 className="font-bold text-slate-800">{m.name}</h3>
                             <p className="text-xs text-red-400">Subscription data unavailable</p>
@@ -303,7 +305,7 @@ export default function Contributions() {
   );
 }
 
-// ... Sub-components (StatBadge, SkeletonLoader, NoCycleState) stay the same ...
+// ... Sub-components remain unchanged ...
 function StatBadge({ label, value, sub, icon: Icon, color }) {
     const colors = {
         emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",

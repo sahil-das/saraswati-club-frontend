@@ -117,7 +117,7 @@ export default function Login() {
         <p className="text-center mt-8 text-slate-500 text-sm font-medium">
           New to ClubKhata?{" "}
           <Link to="/register" className="text-indigo-600 font-bold hover:text-indigo-700 hover:underline transition-all">
-            Create an account
+            Resister your club here
           </Link>
         </p>
       </div>

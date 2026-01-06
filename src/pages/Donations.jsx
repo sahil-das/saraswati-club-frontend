@@ -55,7 +55,7 @@ export default function Donations() {
     loadDonations();
   }, [activeClub]);
 
-  const totalAmount = donations.reduce((sum, d) => sum + d.amount, 0);
+  const totalAmount = donations.reduce((sum, d) => sum + Number(d.amount), 0);
 
   const filteredDonations = useMemo(() => {
       return donations.filter(d => 

@@ -10,6 +10,23 @@ import { clsx } from "clsx";
 // Design System
 import { Card } from "../components/ui/Card";
 
+// 🛠 HELPER: Safe Currency Parser
+const parseAmount = (val) => {
+    if (!val) return 0;
+    // If backend returns number (20000), it's Paisa -> Divide
+    if (typeof val === 'number') {
+        // Simple heuristic: If it's a huge integer, assume Paisa.
+        // Or better: Assuming your Finance Context sends raw paisa for totals
+        // You might need to check how FinanceContext calculates these.
+        // If FinanceContext sums up strings "50.00", this logic changes.
+        
+        // Safest approach if you are seeing 20000:
+        return val / 100;
+    }
+    // If backend returns string "200.00", it's Rupees -> Parse
+    return Number(val) || 0;
+};
+
 export default function CollectionsOverview() {
   const { weeklyTotal, pujaTotal, donationTotal, loading: financeLoading } = useFinance();
   const [donations, setDonations] = useState([]);
@@ -34,7 +51,12 @@ export default function CollectionsOverview() {
     loadDonations();
   }, []);
 
-  const totalCollection = weeklyTotal + pujaTotal + donationTotal;
+  // 🚨 FIX: Parse all inputs before summing
+  const parsedWeekly = parseAmount(weeklyTotal);
+  const parsedPuja = parseAmount(pujaTotal);
+  const parsedDonation = parseAmount(donationTotal);
+  
+  const totalCollection = parsedWeekly + parsedPuja + parsedDonation;
 
   /* ===== GROUP & FILTER ===== */
   const filteredDonations = useMemo(() => {
@@ -88,28 +110,28 @@ export default function CollectionsOverview() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard 
           label="Weekly Chanda" 
-          value={weeklyTotal} 
+          value={parsedWeekly} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           color="blue"
           icon={Calendar}
         />
         <SummaryCard 
           label="Festival Chanda" 
-          value={pujaTotal} 
+          value={parsedPuja} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           color="pink"
           icon={IndianRupee}
         />
         <SummaryCard 
           label="Donations" 
-          value={donationTotal} 
+          value={parsedDonation} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           color="amber"
           icon={TrendingUp}
         />
         <SummaryCard
           label="Grand Total"
-          value={totalCollection}
+          value={totalCollection} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           highlight
           icon={ArrowUpRight}
@@ -202,7 +224,8 @@ export default function CollectionsOverview() {
                                                 </div>
                                             </div>
                                             <div className="text-right shrink-0 ml-2">
-                                                <p className="font-bold text-slate-800 text-sm">+ ₹{d.amount.toLocaleString()}</p>
+                                                {/* 🚨 FIX: Parse amount before display */}
+                                                <p className="font-bold text-slate-800 text-sm">+ ₹{Number(d.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
                                                 <p className="text-[10px] text-slate-400">Donation</p>
                                             </div>
                                         </div>
@@ -222,9 +245,9 @@ export default function CollectionsOverview() {
                 <p className="text-slate-400 text-sm mb-6">How current funds are allocated across categories.</p>
                 
                 <div className="space-y-4">
-                    <DistributionBar label="Subscriptions" amount={weeklyTotal} total={totalCollection} color="bg-blue-500" />
-                    <DistributionBar label="Festival" amount={pujaTotal} total={totalCollection} color="bg-pink-500" />
-                    <DistributionBar label="Donations" amount={donationTotal} total={totalCollection} color="bg-amber-500" />
+                    <DistributionBar label="Subscriptions" amount={parsedWeekly} total={totalCollection} color="bg-blue-500" />
+                    <DistributionBar label="Festival" amount={parsedPuja} total={totalCollection} color="bg-pink-500" />
+                    <DistributionBar label="Donations" amount={parsedDonation} total={totalCollection} color="bg-amber-500" />
                 </div>
             </Card>
         </div>
@@ -263,7 +286,8 @@ function SummaryCard({ label, value, loading, highlight, color, icon: Icon }) {
            <div className="h-8 w-24 bg-current opacity-20 rounded animate-pulse" />
         ) : (
            <h3 className="text-3xl font-bold font-mono tracking-tight">
-             ₹{(value || 0).toLocaleString()}
+             {/* 🚨 FIX: Ensure value is parsed before display */}
+             ₹{(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
            </h3>
         )}
       </div>

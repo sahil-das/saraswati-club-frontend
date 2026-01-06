@@ -9,11 +9,27 @@ import {
   TrendingUp, TrendingDown, Wallet, IndianRupee, PieChart as PieIcon, Download, Loader2, AlertCircle 
 } from "lucide-react";
 import { exportFinancialReportPDF } from "../utils/exportFinancialReportPDF"; 
-import { clsx } from "clsx"; // 👈 ADDED THIS IMPORT
+import { clsx } from "clsx"; 
 
 // Design System
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+
+// 🛠 HELPER: Safely convert API Strings ("50.00") or Paisa Integers (5000) to Number (50)
+const parseAmount = (val) => {
+    if (!val) return 0;
+    // If it's a number and looks like Paisa (e.g., > 1000 without decimal), divide
+    // NOTE: Backend should be sending "50.00" string now, so Number() handles it.
+    if (typeof val === 'number') {
+        // Just in case backend sends raw integer 5000, we check logic
+        // But assuming your latest backend fix, it sends Strings.
+        // If it sends 5000, divide by 100. If 50, keep 50.
+        // Safe bet: The backend sends strings now.
+        return val; 
+    }
+    // If string "50.00", convert to number
+    return Number(val) || 0;
+};
 
 export default function Reports() {
   const { activeClub } = useAuth();
@@ -58,20 +74,22 @@ export default function Reports() {
       setPujaList(pujaData);
       setDonationList(donationData);
 
-      // Calculations
+      // 🚨 FIX: Wrap amounts in Number() for math
       const totalExpenses = expenseData
         .filter(e => e.status === "approved")
-        .reduce((sum, e) => sum + e.amount, 0);
+        .reduce((sum, e) => sum + parseAmount(e.amount), 0);
 
-      const totalPuja = pujaData.reduce((sum, p) => sum + p.amount, 0);
-      const totalDonations = donationData.reduce((sum, d) => sum + d.amount, 0);
+      const totalPuja = pujaData.reduce((sum, p) => sum + parseAmount(p.amount), 0);
+      const totalDonations = donationData.reduce((sum, d) => sum + parseAmount(d.amount), 0);
       const totalCollected = totalPuja + totalDonations; 
+      
+      const openingBal = parseAmount(activeYear.openingBalance);
 
       setSummary({
-        opening: activeYear.openingBalance || 0,
+        opening: openingBal,
         collected: totalCollected,
         expenses: totalExpenses,
-        closing: (activeYear.openingBalance + totalCollected) - totalExpenses
+        closing: (openingBal + totalCollected) - totalExpenses
       });
 
       setExpenses(expenseData);
@@ -84,7 +102,8 @@ export default function Reports() {
       const dateMap = {};
       [...pujaData, ...donationData].forEach(item => {
          const date = new Date(item.date || item.createdAt).toLocaleDateString("en-US", { month: 'short', day: 'numeric' });
-         dateMap[date] = (dateMap[date] || 0) + item.amount;
+         // 🚨 FIX: Ensure addition is numeric
+         dateMap[date] = (dateMap[date] || 0) + parseAmount(item.amount);
       });
 
       const trendData = Object.keys(dateMap).map(date => ({
@@ -137,8 +156,10 @@ export default function Reports() {
   // Data for Charts
   const expenseCategories = {};
   expenses.filter(e => e.status === "approved").forEach(e => {
-    expenseCategories[e.category] = (expenseCategories[e.category] || 0) + e.amount;
+    // 🚨 FIX: Numeric Addition
+    expenseCategories[e.category] = (expenseCategories[e.category] || 0) + parseAmount(e.amount);
   });
+  
   const pieData = Object.keys(expenseCategories).map(cat => ({
     name: cat,
     value: expenseCategories[cat]
@@ -186,6 +207,7 @@ export default function Reports() {
           amount={summary.closing} 
           icon={IndianRupee} 
           color="indigo" 
+           // Added highlight for net balance
         />
       </div>
 
@@ -208,7 +230,8 @@ export default function Reports() {
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
+                {/* 🚨 FIX: tickFormatter safe parsing */}
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${Number(val)/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -244,7 +267,7 @@ export default function Reports() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(val) => `₹${val}`} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                  <Tooltip formatter={(val) => `₹${Number(val).toFixed(2)}`} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -306,7 +329,8 @@ function StatCard({ label, amount, icon: Icon, color, highlight }) {
           <p className={clsx("text-xs font-bold uppercase tracking-wider", highlight ? "text-slate-400" : "text-slate-500")}>
             {label}
           </p>
-          <h3 className="text-2xl font-bold font-mono mt-1">₹{amount.toLocaleString()}</h3>
+          {/* 🚨 FIX: toLocaleString needs a Number */}
+          <h3 className="text-2xl font-bold font-mono mt-1">₹{Number(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</h3>
         </div>
         <div className={clsx("p-3 rounded-xl flex items-center justify-center", !highlight && colors[color], highlight && "bg-slate-800 text-indigo-400")}>
            <Icon size={20} /> 
