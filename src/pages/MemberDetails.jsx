@@ -6,7 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { 
   Phone, Calendar, Shield, ArrowLeft, Loader2, Plus, 
   CheckCircle, IndianRupee, CreditCard, AlertCircle, 
-  Mail, Hash, ShieldCheck, Lock, Sparkles
+  Mail, Hash, ShieldCheck, Lock
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -19,16 +19,12 @@ import AddPujaModal from "../components/AddPujaModal";
 // 🛠 HELPER: Handle both Paisa Integers (20000) and Rupee Strings ("200.00")
 const parseAmount = (val) => {
     if (!val) return 0;
-    // If backend returns number (20000), it's Paisa -> Divide
-    if (typeof val === 'number') {
-        return val / 100;
-    }
-    // If backend returns string "200.00", it's Rupees -> Parse
+    if (typeof val === 'number') return val / 100;
     return Number(val) || 0;
 };
 
 export default function MemberDetails() {
-  const { memberId } = useParams();
+  const { memberId } = useParams(); // This is the Membership ID
   const navigate = useNavigate();
   const { activeClub } = useAuth();
   const toast = useToast();
@@ -44,6 +40,7 @@ export default function MemberDetails() {
   
   const [showChandaModal, setShowChandaModal] = useState(false);
   const [confirmPayment, setConfirmPayment] = useState({ isOpen: false, inst: null });
+  const [isGridOpen, setIsGridOpen] = useState(false);
 
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -55,9 +52,7 @@ export default function MemberDetails() {
       // 1. CHECK ACTIVE YEAR
       try {
         const yearRes = await api.get("/years/active");
-        if (!yearRes.data.data) {
-           setIsYearClosed(true);
-        }
+        if (!yearRes.data.data) setIsYearClosed(true);
       } catch (e) {
          setIsYearClosed(true);
       }
@@ -66,13 +61,17 @@ export default function MemberDetails() {
       const subRes = await api.get(`/subscriptions/member/${memberId}`);
       const data = subRes.data.data;
       
+      // ✅ FIX 1: Correct Data Mapping
+      // The backend now sends a "member" object with details
       setMember({
-        id: memberId,
-        name: data.memberName || data.member?.name,
-        clubId: data.memberUserId || data.member?.userId || "N/A", 
-        role: data.member?.role || "member",
-        phone: data.phone || data.member?.phone || "No Phone",
-        email: data.email || data.member?.email || data.member?.personalEmail || "No Email",
+        id: memberId, // The Membership ID
+        name: data.member?.name || "Unnamed Member",
+        // Don't map email to clubId! Use the memberId for display
+        clubId: memberId, 
+        role: "member", // Default to member (or fetch if needed)
+        phone: data.member?.phone || "No Phone",
+        // Map personalEmail correctly
+        email: data.member?.personalEmail || data.member?.email || "No Email",
         joinedYear: data.year?.name
       });
 
@@ -82,16 +81,19 @@ export default function MemberDetails() {
       // 3. Fetch Puja Fees
       if (!isYearClosed) {
         try {
-            const userIdToFetch = data.memberUserId || data.member?.userId;
-            const feeRes = await api.get(`/member-fees/member/${userIdToFetch}`);
-            setChandaHistory(feeRes.data.data.records || []);
+            // ✅ FIX 2: Use the User ID provided by the new backend logic
+            const userIdToFetch = data.member?.userId || data.memberUserId;
             
-            // 🚨 FIX: Parse all amounts before setting state
-            setStats({
-              subPaid: parseAmount(data.subscription?.totalPaid),
-              subDue: parseAmount(data.subscription?.totalDue),
-              chandaPaid: parseAmount(feeRes.data.data.total)
-            });
+            if (userIdToFetch) {
+                  const feeRes = await api.get(`/member-fees/member/${userIdToFetch}`);
+                  setChandaHistory(feeRes.data.data.records || []);
+                  
+                  setStats({
+                    subPaid: parseAmount(data.subscription?.totalPaid),
+                    subDue: parseAmount(data.subscription?.totalDue),
+                    chandaPaid: parseAmount(feeRes.data.data.total)
+                  });
+            }
         } catch (e) {
             console.warn("Chanda fetch failed", e);
         }
@@ -99,9 +101,7 @@ export default function MemberDetails() {
 
     } catch (err) {
       console.error("Member Details Error:", err);
-      if (!isYearClosed) {
-         toast.error("Failed to load member data");
-      }
+      if (!isYearClosed) toast.error("Failed to load member data");
     } finally {
       setLoading(false);
     }
@@ -117,11 +117,11 @@ export default function MemberDetails() {
     try {
       const res = await api.post("/subscriptions/pay", {
         subscriptionId: subscription._id,
-        installmentNumber: inst.number
+        installmentNumber: inst.number,
+        memberId: memberId 
       });
       setSubscription(res.data.data);
       
-      // 🚨 FIX: Parse response amounts
       setStats(prev => ({ 
           ...prev, 
           subPaid: parseAmount(res.data.data.totalPaid), 
@@ -156,10 +156,7 @@ export default function MemberDetails() {
       
       {/* 1. TOP BAR */}
       <div className="flex items-center gap-4">
-        <button 
-            onClick={() => navigate(-1)} 
-            className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-500 transition-all border border-transparent hover:border-slate-200"
-        >
+        <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-500 transition-all border border-transparent hover:border-slate-200">
             <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-slate-800 hidden md:block">Member Profile</h1>
@@ -211,7 +208,7 @@ export default function MemberDetails() {
          </div>
       </div>
 
-      {/* 3. MAIN CONTENT */}
+      {/* 3. MAIN CONTENT - (Subscriptions & Stats Logic Same as Before) */}
       {isYearClosed ? (
         <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm ring-4 ring-slate-100">
@@ -230,7 +227,6 @@ export default function MemberDetails() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
             {/* LEFT COLUMN: SUBSCRIPTION */}
             {frequency !== 'none' && (
             <div className="lg:col-span-2 space-y-6">
@@ -241,6 +237,7 @@ export default function MemberDetails() {
                         <CreditCard className="text-indigo-600" size={20} /> Subscription Status
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">
+                            {/* ✅ This will now work because backend sends subscription.year */}
                             {frequency === 'monthly' ? 'Monthly' : 'Weekly'} Plan • <span className="font-bold text-slate-700">₹{parseAmount(subscription?.year?.amountPerInstallment)}</span> / period
                         </p>
                     </div>
@@ -287,7 +284,6 @@ export default function MemberDetails() {
                 <div className="grid grid-cols-2 gap-4">
                     <Card noPadding className="bg-white border-slate-200 p-4">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Paid</p>
-                        {/* 🚨 FIX: toLocaleString on number */}
                         <p className="text-xl font-bold text-emerald-600 font-mono">₹{totalContribution.toLocaleString()}</p>
                     </Card>
                     {frequency !== 'none' && (
@@ -319,7 +315,6 @@ export default function MemberDetails() {
                                         <p className="text-sm font-bold text-slate-700">Festival Payment</p>
                                         <p className="text-[10px] text-slate-400">{new Date(fee.createdAt).toLocaleDateString()}</p>
                                     </div>
-                                    {/* 🚨 FIX: Parse individual fee amount */}
                                     <span className="text-sm font-bold font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">+ ₹{parseAmount(fee.amount)}</span>
                                 </div>
                                 {fee.notes && <p className="text-xs text-slate-400 mt-1 italic">"{fee.notes}"</p>}
@@ -349,7 +344,8 @@ export default function MemberDetails() {
       )}
 
       {showChandaModal && !isYearClosed && (
-         <AddPujaModal onClose={() => setShowChandaModal(false)} refresh={fetchData} preSelectedMemberId={member.clubId} />
+         // ✅ FIX 3: Pass memberId (from URL) instead of member.clubId (which was incorrectly mapped to email)
+         <AddPujaModal onClose={() => setShowChandaModal(false)} refresh={fetchData} preSelectedMemberId={memberId} />
       )}
 
       <ConfirmModal 

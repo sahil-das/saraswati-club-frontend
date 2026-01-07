@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardHome() {
-  const { activeClub, user } = useAuth(); // 👈 Added 'user'
+  const { activeClub, user } = useAuth(); 
   const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,8 +39,7 @@ export default function DashboardHome() {
     return "Good Evening";
   }, []);
 
-// Add this state at the top of DashboardHome component
-const [frequency, setFrequency] = useState(null); 
+  const [frequency, setFrequency] = useState(null); 
 
   const fetchSummary = async () => {
     try {
@@ -51,12 +50,19 @@ const [frequency, setFrequency] = useState(null);
         api.get("/years/active")
       ]);
       
-      setData(summaryRes.data.data);
-      
+      const summaryData = summaryRes.data.data;
+      setData(summaryData);
+      console.log("Fetched Summary:", summaryData);
       // Set frequency (weekly/monthly/none)
       if (yearRes.data.data) {
         setFrequency(yearRes.data.data.subscriptionFrequency);
       }
+
+      // ✅ AUTOMATIC TRIGGER: If no active year & User is Admin -> Show Modal
+      if (summaryData?.yearName === "No Active Year" && activeClub?.role === 'admin') {
+         setShowCreateYear(true);
+      }
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -219,7 +225,6 @@ const [frequency, setFrequency] = useState(null);
              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 
                 {/* 1. Dynamic Subscription Card */}
-                {/* Only show if frequency is NOT 'none' */}
                 {frequency && frequency !== 'none' && (
                   <BreakdownCard 
                     label={frequency === 'weekly' ? 'Weekly Chanda' : 'Monthly Chanda'} 

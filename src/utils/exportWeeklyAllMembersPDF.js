@@ -1,40 +1,63 @@
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+/* =========================================================
+   CONSTANTS & THEME
+   ========================================================= */
+const COLORS = {
+  primary: [79, 70, 229], // Indigo-600
+  secondary: [100, 116, 139], // Slate-500
+  text: [30, 41, 59], // Slate-800
+  success: [22, 163, 74], // Green-600
+  danger: [220, 38, 38], // Red-600
+  lightBg: [248, 250, 252], // Slate-50
+  accent: [245, 158, 11], // Amber
+};
+
 const sanitizeName = (s) => String(s || "").trim().replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+const formatCurrency = (n) => `Rs. ${Number(n || 0).toLocaleString("en-IN")}`;
 
 export function exportWeeklyAllMembersPDF({
   clubName = "Saraswati Club",
   members = [],
   cycle = { name: "Current Cycle", totalWeeks: 0, weeklyAmount: 0 },
+  frequency = "weekly", 
 }) {
-  const doc = new jsPDF();
+  // 1. Setup PDF (Portrait is sufficient for List View)
+  const doc = new jsPDF({ orientation: "portrait" });
+  const pageWidth = doc.internal.pageSize.width;
+  const margin = 14;
 
-  const formatCurrency = (amount) => `Rs. ${Number(amount).toLocaleString('en-IN')}`;
-  const totalWeeks = Number(cycle.totalWeeks) || 52; // Default to 52 if missing
-  const weekAmount = Number(cycle.weeklyAmount) || 0;
-  const totalExpectedPerMember = totalWeeks * weekAmount;
+  const isMonthly = frequency === "monthly";
+  const frequencyLabel = isMonthly ? "Monthly" : "Weekly";
+  const unitLabel = isMonthly ? "Months" : "Weeks";
 
-  // --- 1. CALCULATE GLOBAL STATS ---
+  // --- CALCULATIONS ---
+  const totalInstallments = Number(cycle.totalWeeks) || (isMonthly ? 12 : 52);
+  const amountPerInstallment = Number(cycle.weeklyAmount) || 0;
+  const totalExpectedPerMember = totalInstallments * amountPerInstallment;
+
   let globalTotalPaid = 0;
   let globalTotalExpected = members.length * totalExpectedPerMember;
-  
-  const memberRows = members.map((member) => {
-    const paidWeeksCount = Array.isArray(member.weeks) 
-      ? member.weeks.filter((w) => w.paid).length
-      : (member.payments?.length || 0);
 
-    const totalPaid = paidWeeksCount * weekAmount;
+  const processedMembers = members.map((member) => {
+    // Determine paid items safely
+    const paidItems = Array.isArray(member.payments) 
+      ? member.payments 
+      : (Array.isArray(member.subscription?.installments) ? member.subscription.installments.filter(i => i.isPaid) : []);
+
+    const paidCount = paidItems.length;
+    const totalPaid = paidCount * amountPerInstallment;
     const dueAmount = totalExpectedPerMember - totalPaid;
     globalTotalPaid += totalPaid;
 
-    return [
-      member.name,
-      `${paidWeeksCount} / ${totalWeeks}`,
-      formatCurrency(totalPaid),
-      formatCurrency(dueAmount),
-      dueAmount === 0 ? "All Paid" : "Pending"
-    ];
+    return {
+      name: member.name,
+      progress: `${paidCount} / ${totalInstallments}`,
+      totalPaid,
+      dueAmount,
+      status: dueAmount <= 0 ? "Complete" : "Pending"
+    };
   });
 
   const collectionRate = globalTotalExpected > 0 
@@ -42,163 +65,128 @@ export function exportWeeklyAllMembersPDF({
     : "0.0";
 
   let y = 0;
+  const toTitleCase = (str) => {
+    return String(str || "")
+      .toLowerCase()
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+  // ================= 1. HEADER =================
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 0, pageWidth, 4, "F");
 
-  // ================= 2. HEADER & SUMMARY (Same as before) =================
-  doc.setFillColor(63, 81, 181); 
-  doc.rect(0, 0, 210, 40, "F"); 
-
-  doc.setFontSize(22);
+  // Logo (Top Right)
+  const logoSize = 10;
+  const logoY = 12;
+  const logoX = pageWidth - margin - 35; 
+  doc.setFillColor(...COLORS.primary);
+  doc.roundedRect(logoX, logoY, logoSize, logoSize, 2.5, 2.5, "F");
   doc.setTextColor(255, 255, 255);
-  doc.text(clubName.toUpperCase(), 14, 20);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.text("CK", logoX + 5, logoY + 6.5, { align: "center" });
+  doc.setTextColor(...COLORS.primary);
+  doc.setFontSize(12);
+  doc.text("ClubKhata", logoX + 14, logoY + 6.5);
 
-  doc.setFontSize(11);
-  doc.setTextColor(220, 220, 255);
-  doc.text("Annual Contribution Matrix", 14, 30); // Changed Title
+  // Title
+  doc.setFontSize(22);
+  doc.setTextColor(...COLORS.text);
+  doc.setFont("helvetica", "bold");
+  doc.text(toTitleCase(clubName), margin, 20);
 
+  doc.setFontSize(12);
+  doc.setTextColor(...COLORS.primary);
+  doc.text(`${frequencyLabel} Collection Report`, margin, 28);
+
+  // Metadata
   doc.setFontSize(10);
-  doc.text(`Cycle: ${cycle.name}`, 195, 20, { align: "right" });
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 195, 30, { align: "right" });
+  doc.setTextColor(...COLORS.secondary);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Cycle: ${cycle.name}  |  Generated: ${new Date().toLocaleDateString()}`, margin, 35);
 
-  y = 55;
+  doc.setDrawColor(226, 232, 240);
+  doc.line(margin, 42, pageWidth - margin, 42);
+  
+  y = 50;
 
-  // Summary Card
-  doc.setDrawColor(220, 220, 220);
-  doc.setFillColor(250, 250, 252);
-  doc.roundedRect(14, y - 10, 182, 30, 3, 3, "FD");
+  // ================= 2. SUMMARY CARD (With Rate) =================
+  doc.setFillColor(...COLORS.lightBg);
+  doc.roundedRect(margin, y - 5, pageWidth - (margin * 2), 25, 3, 3, "F");
 
-  const col1 = 24, col2 = 85, col3 = 145;
-  doc.setFontSize(9); doc.setTextColor(100); doc.setFont(undefined, 'bold');
-  doc.text("TOTAL MEMBERS", col1, y);
-  doc.text("TOTAL WEEKS", col2, y);
-  doc.text("PROGRESS", col3, y);
+  // Define 4 Columns for the Summary
+  const colWidth = (pageWidth - (margin * 2)) / 4;
+  const col1 = margin + 5;
+  const col2 = margin + colWidth + 5;
+  const col3 = margin + (colWidth * 2) + 5;
+  const col4 = margin + (colWidth * 3) + 5;
 
-  doc.setFontSize(12); doc.setTextColor(40); doc.setFont(undefined, 'normal');
-  doc.text(`${members.length}`, col1, y + 8);
-  doc.text(`${totalWeeks}`, col2, y + 8);
-  // Ensure we pass RGB as separate args to setTextColor
-  const collectionColor = collectionRate === "100.0" ? [46, 125, 50] : [198, 40, 40];
-  doc.setTextColor(...collectionColor);
-  doc.text(`${collectionRate}% Collected`, col3, y + 8);
+  // Labels
+  doc.setFontSize(8); doc.setTextColor(100); doc.setFont(undefined, 'bold');
+  doc.text("TOTAL MEMBERS", col1, y + 5);
+  doc.text(`TOTAL ${unitLabel.toUpperCase()}`, col2, y + 5);
+  doc.text("CONTRIBUTION RATE", col3, y + 5); // ✅ Added Rate Label
+  doc.text("COLLECTION RATE", col4, y + 5);
+
+  // Values
+  doc.setFontSize(11); doc.setTextColor(...COLORS.text); doc.setFont(undefined, 'normal');
+  doc.text(`${members.length}`, col1, y + 13);
+  doc.text(`${totalInstallments}`, col2, y + 13);
+  
+  // ✅ Show Rate (e.g., "Rs. 200 / Week")
+  doc.setTextColor(...COLORS.primary);
+  doc.text(`${formatCurrency(amountPerInstallment)} / ${isMonthly ? 'Mo' : 'Wk'}`, col3, y + 13);
+
+  // Progress %
+  const rateColor = collectionRate === "100.0" ? COLORS.success : (Number(collectionRate) < 50 ? COLORS.danger : COLORS.primary);
+  doc.setTextColor(...rateColor);
+  doc.text(`${collectionRate}%`, col4, y + 13);
 
   y += 35;
 
-  // ================= 3. OVERVIEW TABLE =================
-  doc.setFontSize(14);
-  doc.setTextColor(0);
-  doc.setFont(undefined, 'bold');
-  doc.text("Member Summary", 14, y);
+  // ================= 3. UNIFIED SUMMARY TABLE =================
+  doc.setFontSize(12); doc.setTextColor(...COLORS.text); doc.setFont(undefined, 'bold');
+  doc.text("Member Collection Summary", margin, y);
   y += 5;
 
+  const tableBody = processedMembers.map(m => [
+      m.name,
+      m.progress,
+      formatCurrency(m.totalPaid),
+      formatCurrency(m.dueAmount),
+      m.status
+  ]);
+
   autoTable(doc, {
-    startY: y,
-    head: [["Name", "Progress", "Paid", "Due", "Status"]],
-    body: memberRows,
-    theme: "grid",
-    headStyles: { fillColor: [50, 50, 50], textColor: 255, fontStyle: 'bold' },
-    styles: { fontSize: 10, cellPadding: 3 },
-    columnStyles: {
-      2: { textColor: [46, 125, 50], halign: 'right' },
-      3: { textColor: [198, 40, 40], halign: 'right' },
-      4: { halign: 'center', fontStyle: 'bold' }
-    }
+      startY: y,
+      head: [["Name", `Progress (${unitLabel})`, "Paid Amount", "Due Amount", "Status"]],
+      body: tableBody,
+      theme: "striped",
+      headStyles: { fillColor: COLORS.primary },
+      columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'right', textColor: COLORS.success },
+          3: { halign: 'right', textColor: COLORS.danger, fontStyle: 'bold' },
+          4: { halign: 'center', fontStyle: 'bold' }
+      },
+      didParseCell: (data) => {
+           if (data.column.index === 4 && data.section === 'body') {
+              if (data.cell.raw === "Complete") data.cell.styles.textColor = COLORS.success;
+              else data.cell.styles.textColor = COLORS.secondary;
+          }
+      }
   });
 
-  y = doc.lastAutoTable.finalY + 15;
-
-  // ================= 4. COMPACT MATRIX GRID (Best for 50 Weeks) =================
-  if (y > 250) { doc.addPage(); y = 20; }
-
-  doc.setFontSize(14);
-  doc.setTextColor(0);
-  doc.text("Detailed Weekly Matrix", 14, y);
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text("(Green = Paid, White = Pending)", 14, y + 6);
-  y += 12;
-
-  // Iterate over each member to create a Grid
-  members.forEach((member, index) => {
-    // Check if we need a new page
-    if (y > 250) { doc.addPage(); y = 20; }
-
-    // 1. Member Header
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, y, 182, 8, "F"); // Light gray header bg
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.setFont(undefined, 'bold');
-    doc.text(`${index + 1}. ${member.name}`, 18, y + 5.5);
-    y += 8;
-
-    // 2. Build the Grid Data (Rows of 10 weeks)
-    const paidWeekNumbers = new Set(
-        Array.isArray(member.weeks) 
-        ? member.weeks.filter(w => w.paid).map(w => w.week) 
-        : member.payments?.map(p => p.week) || []
-    );
-
-    const gridRows = [];
-    let currentRow = [];
-    
-    // Create rows of 10 columns (e.g. Weeks 1-10, 11-20...)
-    for (let w = 1; w <= totalWeeks; w++) {
-        currentRow.push({
-            content: String(w),
-            paid: paidWeekNumbers.has(w)
-        });
-        if (currentRow.length === 10 || w === totalWeeks) {
-            // Fill remaining empty cells if last row is incomplete
-            while(currentRow.length < 10) currentRow.push({ content: "", paid: false });
-            gridRows.push(currentRow);
-            currentRow = [];
-        }
-    }
-
-    // 3. Draw the Grid using autoTable
-    autoTable(doc, {
-        startY: y,
-        body: gridRows.map(row => row.map(cell => cell.content)), // Just numbers
-        theme: 'grid',
-        styles: { 
-            fontSize: 9, 
-            halign: 'center', 
-            valign: 'middle', 
-            cellPadding: 1,
-            lineWidth: 0.1,
-            lineColor: [200, 200, 200]
-        },
-        // IMPORTANT: Color the cells based on status
-        didParseCell: (data) => {
-            if (data.section === 'body') {
-                const rowIndex = data.row.index;
-                const colIndex = data.column.index;
-                const cellData = gridRows[rowIndex][colIndex];
-                
-                if (cellData && cellData.paid) {
-                    // Paid = Green Background
-                    data.cell.styles.fillColor = [220, 255, 220]; 
-                    data.cell.styles.textColor = [0, 100, 0];
-                    data.cell.styles.fontStyle = 'bold';
-                } else if (cellData && cellData.content !== "") {
-                    // Unpaid = Default White
-                    data.cell.styles.textColor = [150, 150, 150];
-                }
-            }
-        },
-        margin: { left: 14, right: 14 },
-    });
-
-    y = doc.lastAutoTable.finalY + 8; // Space between members
-  });
-
-  // Footer Page Numbers
+  // Footer
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: "right" });
+    doc.setTextColor(...COLORS.secondary);
+    doc.text(`Generated by ClubKhata`, margin, doc.internal.pageSize.height - 10);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, doc.internal.pageSize.height - 10, { align: "right" });
   }
 
-  doc.save(`${sanitizeName(clubName)}_Weekly_Matrix_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`${sanitizeName(clubName)}_${frequencyLabel}_Report.pdf`);
 }

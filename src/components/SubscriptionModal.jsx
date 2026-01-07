@@ -56,11 +56,12 @@ export default function SubscriptionModal({ memberId, onClose, canEdit }) {
   const handleToggle = async (installmentNumber) => {
     if (!canEdit || processingId) return;
     setProcessingId(installmentNumber);
-    try {
-      const res = await api.post("/subscriptions/pay", {
-        subscriptionId: data.subscription._id,
-        installmentNumber
-      });
+      try {
+        const res = await api.post("/subscriptions/pay", { 
+          subscriptionId, 
+          installmentNumber, 
+          memberId 
+        });
       setData(prev => ({ ...prev, subscription: res.data.data }));
     } catch (err) { 
         alert("Payment failed"); 
