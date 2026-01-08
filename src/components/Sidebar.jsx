@@ -108,7 +108,7 @@ export default function Sidebar({ isOpen, onClose }) {
             let label = item.label;
             if (item.path === "/contributions") {
               if (!frequency || frequency === "none") return null;
-              label = frequency === "weekly" ? "Weekly Chanda" : "Monthly Chanda";
+              label = frequency === "weekly" ? "Weekly Collection" : "Monthly Collection";
             }
 
             const active = isActive(item.path);

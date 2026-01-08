@@ -5,13 +5,12 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { 
   Search, UserPlus, Phone, MessageCircle, ShieldCheck, 
-  Trash2, Mail, Loader2, User, ChevronRight, Download // 👈 Download Icon
+  Trash2, Loader2, User, ChevronRight, Download
 } from "lucide-react";
 
 import { Button } from "../components/ui/Button";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import AddMemberModal from "../components/AddMemberModal";
-// ✅ CORRECT IMPORT: Use the existing function from pdfExport.js
 import { exportMembersPDF } from "../utils/pdfExport"; 
 
 export default function Members() {
@@ -22,8 +21,20 @@ export default function Members() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState({ isOpen: false, type: null, id: null });
+  
+  const [confirmAction, setConfirmAction] = useState({ 
+    isOpen: false, 
+    type: null, 
+    id: null,
+    data: null,
+    title: "",
+    message: "",
+    isDangerous: false
+  });
 
+  const isAdmin = activeClub?.role === 'admin';
+
+  // 1. Load Members
   const loadMembers = async () => {
     try {
       setLoading(true);
@@ -39,8 +50,26 @@ export default function Members() {
 
   useEffect(() => { loadMembers(); }, [activeClub]);
 
-  const initiateDelete = (id) => setConfirmAction({ isOpen: true, type: "delete", id, title: "Remove Member?", message: "This cannot be undone.", isDangerous: true });
-  const initiateRoleToggle = (m) => setConfirmAction({ isOpen: true, type: "role", id: m.membershipId, data: m.role === "admin" ? "member" : "admin", title: "Change Role?", message: "Modify admin privileges.", isDangerous: m.role === "member" }); 
+  // 2. Admin Action Handlers
+  const initiateDelete = (id) => {
+    if (!isAdmin) return; 
+    setConfirmAction({ 
+        isOpen: true, type: "delete", id, 
+        title: "Remove Member?", message: "This member will be removed from the club.", 
+        isDangerous: true 
+    });
+  };
+
+  const initiateRoleToggle = (m) => {
+    if (!isAdmin) return; 
+    const newRole = m.role === "admin" ? "member" : "admin";
+    setConfirmAction({ 
+        isOpen: true, type: "role", id: m.membershipId, data: newRole,
+        title: `Make ${newRole === 'admin' ? 'Admin' : 'Member'}?`, 
+        message: `Are you sure you want to change ${m.name}'s role?`, 
+        isDangerous: newRole === "member"
+    }); 
+  };
 
   const executeAction = async () => {
       try {
@@ -49,20 +78,45 @@ export default function Members() {
           setMembers(prev => prev.filter(m => m.membershipId !== confirmAction.id));
           toast.success("Member removed");
         } else if (confirmAction.type === 'role') {
-          await updateMemberRole(confirmAction.id, confirmAction.data);
+          await updateMemberRole(confirmAction.id, { role: confirmAction.data });
           setMembers(prev => prev.map(m => m.membershipId === confirmAction.id ? { ...m, role: confirmAction.data } : m));
           toast.success("Role updated");
         }
-      } catch(e) { toast.error("Action failed"); }
+      } catch(e) { 
+          toast.error(e.response?.data?.message || "Action failed"); 
+      }
       setConfirmAction({ ...confirmAction, isOpen: false });
   };
 
   const filteredMembers = useMemo(() => {
     return members.filter(m => 
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.phone?.includes(searchTerm)
+      (m.phone && m.phone.includes(searchTerm))
     );
   }, [members, searchTerm]);
+
+  // ✅ HELPER: Prepare Data for PDF
+  const handleExport = () => {
+      // 1. Prepare Data (Security Stripping)
+      const dataToExport = filteredMembers.map(m => {
+          if (isAdmin) return m; // Admin gets full object (including phone)
+
+          return {
+              name: m.name,
+              email: m.email, 
+              role: m.role,
+              joinedAt: m.joinedAt
+              // Phone is excluded here for safety
+          };
+      });
+
+      // 2. Call Export with Flag
+      exportMembersPDF({
+          clubName: activeClub?.clubName,
+          members: dataToExport,
+          showPhone: isAdmin // ✅ Pass true if Admin, false if Member
+      });
+    };
 
   if (loading) return <div className="flex justify-center py-20 text-indigo-600"><Loader2 className="animate-spin" /></div>;
 
@@ -77,18 +131,14 @@ export default function Members() {
         </div>
         
         <div className="flex gap-2 w-full md:w-auto">
-             {/* ✅ EXPORT BUTTON */}
              <Button 
                 variant="secondary"
-                onClick={() => exportMembersPDF({
-                    clubName: activeClub?.clubName,
-                    members: filteredMembers
-                })}
+                onClick={handleExport} // 👈 Updated Handler
              >
                 <Download size={18} /> <span className="hidden sm:inline ml-2">Export List</span>
              </Button>
 
-             {activeClub?.role === 'admin' && (
+             {isAdmin && (
                 <Button onClick={() => setShowAddModal(true)} leftIcon={<UserPlus size={18} />}>Add Member</Button>
              )}
         </div>
@@ -99,7 +149,7 @@ export default function Members() {
         <Search className="text-slate-400 ml-2" size={20} />
         <input 
           type="text"
-          placeholder="Search by name, phone..."
+          placeholder="Search by name..."
           className="flex-1 outline-none text-sm p-2 text-slate-700 placeholder:text-slate-400"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -108,73 +158,87 @@ export default function Members() {
 
       {/* MEMBER LIST */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredMembers.map((member) => (
-          <div key={member.membershipId} className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all relative">
-            
-            {/* 1. TOP ROW: CLICKABLE PROFILE LINK */}
-            <div className="flex justify-between items-start">
-               <Link 
-                 to={`/members/${member.membershipId}`} 
-                 className="flex items-center gap-3 flex-1 group-hover:opacity-80 transition-opacity"
-               >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${
-                    member.role === 'admin' 
-                      ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500 ring-offset-2" 
-                      : "bg-slate-100 text-slate-600"
-                  }`}>
-                    {member.name.charAt(0)}
-                  </div>
-                  
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-800 truncate flex items-center gap-1">
-                        {member.name} 
-                        <ChevronRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                       <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                         member.role === 'admin' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-slate-50 text-slate-500 border-slate-100"
-                       }`}>
-                         {member.role}
-                       </span>
+        {filteredMembers.map((member) => {
+          
+          // ✅ CONDITIONAL WRAPPER: Only Admins get a Link, Members get a div
+          const Wrapper = isAdmin ? Link : 'div';
+          const wrapperProps = isAdmin 
+            ? { to: `/members/${member.membershipId}`, className: "flex items-center gap-3 flex-1 group-hover:opacity-80 transition-opacity" }
+            : { className: "flex items-center gap-3 flex-1" };
+
+          return (
+            <div key={member.membershipId} className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all relative">
+              
+              {/* 1. TOP ROW */}
+              <div className="flex justify-between items-start">
+                 <Wrapper {...wrapperProps}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${
+                      member.role === 'admin' 
+                        ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500 ring-offset-2" 
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {member.name.charAt(0).toUpperCase()}
                     </div>
-                  </div>
-               </Link>
+                    
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-slate-800 truncate flex items-center gap-1">
+                          {member.name} 
+                          {/* Only show Chevron if clickable (Admin) */}
+                          {isAdmin && <ChevronRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                      </h3>
+                      
+                      <div className="flex flex-col gap-0.5 mt-0.5">
+                          {/* Role Badge */}
+                          <span className={`w-fit text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                            member.role === 'admin' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                          }`}>
+                            {member.role}
+                          </span>
+                          
+                          {/* ✅ SHOW USER ID (System Email) FOR EVERYONE */}
+                          <span className="text-[11px] text-slate-400 truncate">
+                            {member.email}
+                          </span>
+                      </div>
+                    </div>
+                 </Wrapper>
 
-               {/* Admin Actions */}
-               {activeClub?.role === 'admin' && (
-                 <div className="flex gap-1">
-                    <button onClick={() => initiateRoleToggle(member)} className={`p-2 rounded-lg transition-colors ${member.role === 'admin' ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:bg-slate-50"}`}>
-                      <ShieldCheck size={18} />
-                    </button>
-                    <button onClick={() => initiateDelete(member.membershipId)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={18} />
-                    </button>
-                 </div>
-               )}
-            </div>
+                 {/* 🔒 Admin Actions */}
+                 {isAdmin && (
+                   <div className="flex gap-1">
+                      <button onClick={() => initiateRoleToggle(member)} className={`p-2 rounded-lg transition-colors ${member.role === 'admin' ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:bg-slate-50"}`}>
+                        <ShieldCheck size={18} />
+                      </button>
+                      <button onClick={() => initiateDelete(member.membershipId)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 size={18} />
+                      </button>
+                   </div>
+                 )}
+              </div>
 
-            {/* 2. CONTACT DETAILS */}
-            <div className="mt-4 space-y-2 pl-1">
-              {member.phone && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                  <Phone size={14} className="shrink-0" /> {member.phone}
+              {/* 🔒 2. CONTACT DETAILS (ADMIN ONLY) */}
+              {isAdmin && member.phone && (
+                <div className="mt-4 space-y-2 pl-1">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                      <Phone size={14} className="shrink-0" /> {member.phone}
+                    </div>
                 </div>
               )}
-            </div>
 
-            {/* 3. MOBILE ACTIONS */}
-            {member.phone && (
-               <div className="mt-4 pt-3 border-t border-slate-50 grid grid-cols-2 gap-3">
-                  <a href={`tel:${member.phone}`} className="flex items-center justify-center gap-2 py-2 rounded-lg bg-slate-50 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors">
-                    <Phone size={14} /> Call
-                  </a>
-                  <button onClick={() => window.open(`https://wa.me/${member.phone.replace(/\D/g,'')}`, '_blank')} className="flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors">
-                    <MessageCircle size={14} /> WhatsApp
-                  </button>
-               </div>
-            )}
-          </div>
-        ))}
+              {/* 🔒 3. MOBILE ACTIONS (ADMIN ONLY) */}
+              {isAdmin && member.phone && (
+                 <div className="mt-4 pt-3 border-t border-slate-50 grid grid-cols-2 gap-3">
+                    <a href={`tel:${member.phone}`} className="flex items-center justify-center gap-2 py-2 rounded-lg bg-slate-50 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors">
+                      <Phone size={14} /> Call
+                    </a>
+                    <button onClick={() => window.open(`https://wa.me/${member.phone.replace(/\D/g,'')}`, '_blank')} className="flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors">
+                      <MessageCircle size={14} /> WhatsApp
+                    </button>
+                 </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {filteredMembers.length === 0 && (
@@ -184,7 +248,6 @@ export default function Members() {
          </div>
       )}
 
-      {/* Modals */}
       {showAddModal && <AddMemberModal onClose={() => setShowAddModal(false)} refresh={loadMembers} />}
       <ConfirmModal 
         isOpen={confirmAction.isOpen}

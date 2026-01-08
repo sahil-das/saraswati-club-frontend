@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import { 
-  Archive, Calendar, ChevronRight, Download, Lock, Loader2, TrendingUp, TrendingDown 
+  Archive, Calendar, ChevronRight, Download, Lock, Loader2, 
+  TrendingUp, TrendingDown, AlertTriangle 
 } from "lucide-react";
-import { exportFinancialReportPDF } from "../utils/exportFinancialReportPDF"; 
+import { exportHistoryCyclePDF } from "../utils/pdfExport"; 
 import { clsx } from "clsx";
 
 // Design System
@@ -11,6 +13,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 
 export default function Archives() {
+  const { activeClub } = useAuth();
   const [years, setYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(null);
@@ -56,25 +59,59 @@ export default function Archives() {
     if (!selectedYear || !yearDetails) return;
     
     const { summary, records, info } = yearDetails;
+    const parse = (n) => Number(n) || 0;
+    
+    // 1. Determine Frequency
+    const frequency = info.subscriptionFrequency || 'weekly';
+    const showSubscriptions = frequency !== 'none';
 
-    exportFinancialReportPDF({
-      clubName: "Club Archive Record",
-      year: selectedYear.name,
-      openingBalance: summary.openingBalance,
-      totalIncome: summary.income.total,
-      totalExpense: summary.expense,
-      netBalance: summary.netBalance,
-      frequency: info.subscriptionFrequency, 
-      incomeSources: {
-        weekly: summary.income.subscriptions,
-        puja: summary.income.fees,
-        donation: summary.income.donations
+    // 2. Map Subscriptions (Check multiple locations)
+    const rawSubs = records.subscriptions || records.weekly || [];
+    let mappedSubscriptions = rawSubs.map(s => ({
+        memberName: s.memberName || s.user?.name || "Member",
+        total: parse(s.totalPaid || s.totalAmount || s.total || s.amount)
+    })).filter(s => s.total > 0);
+
+    // Placeholder logic for PDF if details missing but summary exists
+    const summaryTotalSubs = parse(summary.income.subscriptions);
+    if (mappedSubscriptions.length === 0 && summaryTotalSubs > 0 && showSubscriptions) {
+        mappedSubscriptions = [{
+            memberName: "Aggregated Collection (Details Unavailable)",
+            total: summaryTotalSubs
+        }];
+    }
+
+    // 3. Generate PDF
+    exportHistoryCyclePDF({
+      clubName: activeClub?.clubName || "Club Archive Record",
+      cycle: selectedYear,
+      frequency: frequency,
+      
+      summary: {
+        openingBalance: parse(summary.openingBalance),
+        collections: parse(summary.income.total),
+        expenses: parse(summary.expense),
+        closingBalance: parse(summary.netBalance)
       },
-      details: {
-        expenses: records.expenses,
-        donations: records.donations,
-        puja: records.fees
-      }
+
+      weekly: showSubscriptions ? mappedSubscriptions : [],
+      
+      puja: (records.fees || []).map(p => ({
+         memberName: p.user?.name || "Unknown",
+         total: parse(p.amount)
+      })),
+
+      donations: (records.donations || []).map(d => ({
+         donorName: d.donorName || "Anonymous",
+         date: d.date || d.createdAt,
+         amount: parse(d.amount)
+      })),
+
+      expenses: (records.expenses || []).map(e => ({
+         title: e.title,
+         date: e.date || e.createdAt,
+         amount: parse(e.amount)
+      }))
     });
   };
 
@@ -112,23 +149,23 @@ export default function Archives() {
                  className="p-5 flex items-center justify-between cursor-pointer bg-white hover:bg-slate-50/50 transition-colors"
                >
                   <div className="flex items-center gap-4">
-                     <div className={clsx("p-3 rounded-xl transition-colors", selectedYear?._id === year._id ? 'bg-primary-50 text-primary-600' : 'bg-slate-100 text-slate-400')}>
-                        <Calendar size={20} />
-                     </div>
-                     <div>
-                        <h3 className="font-bold text-lg text-slate-800">{year.name}</h3>
-                        <p className="text-xs text-slate-500 flex items-center gap-2">
-                           {new Date(year.startDate).getFullYear()} • 
-                           <span className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                      <div className={clsx("p-3 rounded-xl transition-colors", selectedYear?._id === year._id ? 'bg-primary-50 text-primary-600' : 'bg-slate-100 text-slate-400')}>
+                         <Calendar size={20} />
+                      </div>
+                      <div>
+                         <h3 className="font-bold text-lg text-slate-800">{year.name}</h3>
+                         <p className="text-xs text-slate-500 flex items-center gap-2">
+                            {new Date(year.startDate).getFullYear()} • 
+                            <span className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
                               Closed
-                           </span>
-                        </p>
-                     </div>
+                            </span>
+                         </p>
+                      </div>
                   </div>
 
                   <div className="text-right hidden sm:block">
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Closing Balance</p>
-                     <p className="font-mono font-bold text-lg text-slate-700">₹ {year.closingBalance?.toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Closing Balance</p>
+                      <p className="font-mono font-bold text-lg text-slate-700">₹ {year.closingBalance?.toLocaleString('en-IN')}</p>
                   </div>
                   
                   <ChevronRight size={20} className={clsx("text-slate-400 transition-transform duration-300", selectedYear?._id === year._id && "rotate-90")} />
@@ -147,16 +184,44 @@ export default function Archives() {
                               <DetailBox label="Opening Balance" amount={yearDetails.summary.openingBalance} />
                               <DetailBox label="Total Income" amount={yearDetails.summary.income.total} color="text-emerald-600" icon={<TrendingUp size={14}/>} />
                               <DetailBox label="Total Expenses" amount={yearDetails.summary.expense} color="text-rose-600" icon={<TrendingDown size={14}/>} />
-                              <DetailBox label="Net Balance" amount={yearDetails.summary.netBalance} isBold color="text-primary-700" />
+                              
+                              {/* ⚠️ INTELLIGENT BALANCE BOX */}
+                              <DetailBox 
+                                label={yearDetails.summary.hasDiscrepancy ? "Stored Balance" : "Net Balance"}
+                                amount={yearDetails.summary.netBalance} 
+                                isBold 
+                                color={yearDetails.summary.hasDiscrepancy ? "text-amber-600" : "text-primary-700"}
+                                icon={yearDetails.summary.hasDiscrepancy ? <AlertTriangle size={14} className="text-amber-500" /> : null}
+                                borderColor={yearDetails.summary.hasDiscrepancy ? "border-amber-200 bg-amber-50" : null}
+                              />
                            </div>
+
+                           {/* 🔴 ERROR ALERT (Only shows if Backend reports math mismatch) */}
+                           {yearDetails.summary.hasDiscrepancy && (
+                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3 text-sm text-amber-800">
+                                <AlertTriangle className="mt-0.5 shrink-0" size={16} />
+                                <div>
+                                  <p className="font-bold">Calculation Mismatch Detected</p>
+                                  <p className="opacity-90 mt-1">
+                                    The records sum to <strong>₹{yearDetails.summary.calculatedBalance}</strong>, 
+                                    but the database stored <strong>₹{yearDetails.summary.netBalance}</strong>. 
+                                    Please verify your manual entries.
+                                  </p>
+                                </div>
+                             </div>
+                           )}
 
                            {/* BREAKDOWN */}
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <Card noPadding className="bg-white">
                                     <div className="p-3 border-b border-slate-50 font-bold text-slate-700 text-xs uppercase bg-slate-50/50">Income Sources</div>
                                     <div className="p-3 space-y-2">
+                                        {/* ✅ DYNAMIC LABEL: Weekly vs Monthly */}
                                         {yearDetails.info.subscriptionFrequency !== 'none' && (
-                                            <Row label="Subscriptions" value={yearDetails.summary.income.subscriptions} />
+                                            <Row 
+                                                label={yearDetails.info.subscriptionFrequency === 'monthly' ? "Monthly Collection" : "Weekly Collection"} 
+                                                value={yearDetails.summary.income.subscriptions} 
+                                            />
                                         )}
                                         <Row label="Puja Fees" value={yearDetails.summary.income.fees} />
                                         <Row label="Donations" value={yearDetails.summary.income.donations} />
@@ -196,9 +261,9 @@ export default function Archives() {
   );
 }
 
-function DetailBox({ label, amount, color, isBold, icon }) {
+function DetailBox({ label, amount, color, isBold, icon, borderColor }) {
    return (
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className={clsx("p-4 rounded-xl border shadow-sm transition-colors", borderColor || "bg-white border-slate-200")}>
          <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-1 tracking-wider">
             {icon} {label}
          </p>

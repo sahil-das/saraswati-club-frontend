@@ -109,14 +109,14 @@ export default function CollectionsOverview() {
       {/* 2. STATS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard 
-          label="Weekly Chanda" 
+          label="Weekly collection" 
           value={parsedWeekly} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           color="blue"
           icon={Calendar}
         />
         <SummaryCard 
-          label="Festival Chanda" 
+          label="Festival collection" 
           value={parsedPuja} // 🚨 FIX: Pass parsed value
           loading={financeLoading}
           color="pink"

@@ -8,7 +8,7 @@ import {
 import { 
   TrendingUp, TrendingDown, Wallet, IndianRupee, PieChart as PieIcon, Download, Loader2, AlertCircle 
 } from "lucide-react";
-// ✅ UPDATED IMPORT: Using exportFinancePDF for Current Year Snapshot
+// ✅ IMPORT: Use the Snapshot Export
 import { exportFinancePDF } from "../utils/pdfExport";
 import { clsx } from "clsx"; 
 
@@ -16,7 +16,7 @@ import { clsx } from "clsx";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 
-// 🛠 HELPER: Safely convert API Strings ("50.00") or Paisa Integers (5000) to Number (50)
+// 🛠 HELPER: Safely convert API Strings to Number
 const parseAmount = (val) => {
   if (!val) return 0;
   if (typeof val === 'number') return val; 
@@ -26,14 +26,13 @@ const parseAmount = (val) => {
 export default function Reports() {
   const { activeClub } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [cycle, setCycle] = useState(null);
   
   // Data States
   const [summary, setSummary] = useState({ opening: 0, collected: 0, expenses: 0, closing: 0 });
   const [expenses, setExpenses] = useState([]);
-  const [pujaList, setPujaList] = useState([]);
-  const [donationList, setDonationList] = useState([]);
-  const [contributions, setContributions] = useState([]);
+  const [contributions, setContributions] = useState([]); // Stores breakdown for Chart/PDF
   const [dailyCollection, setDailyCollection] = useState([]);
 
   const COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#8b5cf6", "#ef4444"];
@@ -44,6 +43,8 @@ export default function Reports() {
 
   const fetchReportData = async () => {
     try {
+      setLoading(true);
+      // 1. Get Active Cycle
       const yearRes = await api.get("/years/active");
       const activeYear = yearRes.data.data;
       
@@ -53,30 +54,45 @@ export default function Reports() {
       }
       setCycle(activeYear);
 
-      const [expRes, pujaRes, donateRes] = await Promise.all([
+      // 2. Fetch All Financial Data (Including Members for Subscriptions)
+      const [expRes, pujaRes, donateRes, membersRes] = await Promise.all([
         api.get("/expenses"),
         api.get("/member-fees"),            
-        api.get("/donations")               
+        api.get("/donations"),
+        api.get("/members") // Fetch members to calculate subscriptions
       ]);
 
       const expenseData = expRes.data.data || [];
       const pujaData = pujaRes.data.data || [];
       const donationData = donateRes.data.data || [];
+      const membersList = membersRes.data.data || [];
 
-      setPujaList(pujaData);
-      setDonationList(donationData);
-
-      // 🚨 FIX: Wrap amounts in Number() for math
+      // 3. Calculate Totals
+      // -- Expenses
       const totalExpenses = expenseData
         .filter(e => e.status === "approved")
         .reduce((sum, e) => sum + parseAmount(e.amount), 0);
 
+      // -- Income Sources
       const totalPuja = pujaData.reduce((sum, p) => sum + parseAmount(p.amount), 0);
       const totalDonations = donationData.reduce((sum, d) => sum + parseAmount(d.amount), 0);
-      const totalCollected = totalPuja + totalDonations; 
       
+      // -- Calculate Subscriptions (Fetch individual subs in parallel for accuracy)
+      // NOTE: In a production app, use a summary endpoint. Here we map client-side.
+      const subPromises = membersList.map(m => 
+          api.get(`/subscriptions/member/${m.membershipId || m._id}`).catch(() => ({ data: { data: { subscription: null } } }))
+      );
+      const subResponses = await Promise.all(subPromises);
+      
+      const totalSubscriptions = subResponses.reduce((sum, res) => {
+          const sub = res?.data?.data?.subscription;
+          return sum + parseAmount(sub?.totalPaid);
+      }, 0);
+
+      const totalCollected = totalPuja + totalDonations + totalSubscriptions; 
       const openingBal = parseAmount(activeYear.openingBalance);
 
+      // 4. Update State
       setSummary({
         opening: openingBal,
         collected: totalCollected,
@@ -85,12 +101,16 @@ export default function Reports() {
       });
 
       setExpenses(expenseData);
+      
+      // Breakdown for Charts & PDF
       setContributions([
-        { name: "Puja Chanda", value: totalPuja },
+        { name: activeYear.subscriptionFrequency === 'monthly' ? "Monthly Collection" : "Weekly Collection", value: totalSubscriptions },
+        { name: "Members Contribution", value: totalPuja },
         { name: "Donations", value: totalDonations },
-      ]);
+      ].filter(c => c.value > 0)); // Only show active sources
 
-      // Daily Trend
+      // Daily Trend (Simple approximation using Puja/Donations dates)
+      // Note: Subscriptions usually don't have a single date list easily accessible here without deep mapping
       const dateMap = {};
       [...pujaData, ...donationData].forEach(item => {
          const date = new Date(item.date || item.createdAt).toLocaleDateString("en-US", { month: 'short', day: 'numeric' });
@@ -111,23 +131,32 @@ export default function Reports() {
     }
   };
 
-  // ✅ UPDATED EXPORT HANDLER (Uses exportFinancePDF)
+  // ✅ EXPORT HANDLER: Uses exportFinancePDF
   const handleExport = () => {
-    exportFinancePDF({
-      clubName: activeClub?.clubName || "Club Committee",
-      summary: [
-        { label: "Opening Balance", value: summary.opening },
-        { label: "Total Collected", value: summary.collected },
-        { label: "Total Expenses", value: summary.expenses },
-        { label: "Net Balance", value: summary.closing },
-      ],
-      contributions: contributions.map(c => ({
-        type: c.name,
-        amount: c.value
-      })),
-      // Pass all approved expenses for the detailed table in the snapshot
-      expenses: expenses.filter(e => e.status === "approved")
-    });
+    if (!cycle) return;
+    setExporting(true);
+
+    try {
+        exportFinancePDF({
+            clubName: activeClub?.clubName || "Club Committee",
+            summary: [
+                { label: "Opening Balance", value: summary.opening },
+                { label: "Total Collected", value: summary.collected },
+                { label: "Total Expenses", value: summary.expenses },
+                { label: "Net Balance", value: summary.closing },
+            ],
+            // Maps the calculated contributions (including subscriptions) to the PDF table
+            contributions: contributions.map(c => ({
+                type: c.name,
+                amount: c.value
+            })),
+            expenses: expenses.filter(e => e.status === "approved")
+        });
+    } catch (error) {
+        console.error("Export failed", error);
+    } finally {
+        setExporting(false);
+    }
   };
 
   if (loading) return <div className="h-64 flex justify-center items-center text-primary-600"><Loader2 className="animate-spin w-10 h-10" /></div>;
@@ -142,17 +171,6 @@ export default function Reports() {
     </div>
   );
 
-  // Data for Charts
-  const expenseCategories = {};
-  expenses.filter(e => e.status === "approved").forEach(e => {
-    expenseCategories[e.category] = (expenseCategories[e.category] || 0) + parseAmount(e.amount);
-  });
-  
-  const pieData = Object.keys(expenseCategories).map(cat => ({
-    name: cat,
-    value: expenseCategories[cat]
-  }));
-
   return (
     <div className="space-y-8 pb-20 animate-fade-in">
       
@@ -164,9 +182,10 @@ export default function Reports() {
         </div>
         <Button 
           onClick={handleExport}
-          leftIcon={<Download size={18} />}
+          disabled={exporting}
+          leftIcon={exporting ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
         >
-          Download Snapshot
+          {exporting ? "Generating..." : "Download Snapshot"}
         </Button>
       </div>
 
@@ -191,11 +210,11 @@ export default function Reports() {
           color="rose" 
         />
         <StatCard 
-          title="Net Balance" 
+          label="Net Balance" 
           amount={summary.closing} 
           icon={IndianRupee} 
           color="indigo" 
-          
+       
         />
       </div>
 
@@ -237,12 +256,16 @@ export default function Reports() {
           <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
             <PieIcon size={18} className="text-primary-600"/> Expense Breakdown
           </h3>
-          {pieData.length > 0 ? (
+          {expenses.length > 0 ? (
             <div className="h-[300px] flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={pieData}
+                    data={Object.entries(expenses.reduce((acc, curr) => {
+                        const amt = parseAmount(curr.amount);
+                        if(curr.status === 'approved') acc[curr.category] = (acc[curr.category] || 0) + amt;
+                        return acc;
+                    }, {})).map(([k,v]) => ({ name: k, value: v }))}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -250,7 +273,7 @@ export default function Reports() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {pieData.map((entry, index) => (
+                    {expenses.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

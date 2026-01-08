@@ -94,7 +94,7 @@ export default function MemberDetails() {
                   });
             }
         } catch (e) {
-            console.warn("Chanda fetch failed", e);
+            console.warn("collection fetch failed", e);
         }
       }
 

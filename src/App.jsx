@@ -3,11 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Providers & Components
 import { AuthProvider } from "./context/AuthContext";
-import { FinanceProvider } from "./context/FinanceContext"; // 👈 Keep this import
+import { FinanceProvider } from "./context/FinanceContext"; 
 import ProtectedRoute from "./components/ProtectedRoute";
 import RequireSubscription from "./components/RequireSubscription";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
+
 // Pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard"; 
@@ -29,12 +30,11 @@ import Archives from "./pages/Archives";
 export default function App() {
   return (
     <AuthProvider>
-      {/* ❌ FinanceProvider REMOVED from here to stop API calls on Login page */}
       <ThemeProvider>
         <ToastProvider>
           <BrowserRouter>
             <Routes>
-              {/* PUBLIC ROUTES (No Finance Context needed) */}
+              {/* PUBLIC ROUTES */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<RegisterClub />} />
 
@@ -43,7 +43,6 @@ export default function App() {
                 path="/" 
                 element={
                   <ProtectedRoute>
-                    {/* ✅ MOVED HERE: Only mounts when logged in */}
                     <FinanceProvider>
                       <Dashboard />
                     </FinanceProvider>
@@ -54,21 +53,25 @@ export default function App() {
                 <Route index element={<DashboardHome />} />
                 <Route path="profile" element={<UserProfile />} />
 
-                {/* ✅ FESTIVAL CHANDA (Available to Everyone) */}
+                {/* ✅ AVAILABLE TO EVERYONE */}
                 <Route path="puja-contributions" element={<PujaContributions />} />
                 <Route path="collections" element={<CollectionsOverview />} />
                 <Route path="donations" element={<Donations />} />
                 <Route path="expenses" element={<Expenses />} />
                 <Route path="archives" element={<Archives />} />
                 
+                {/* 🚨 CHANGED: 'Members' is now open to all (Privacy logic handled inside the page) */}
+                <Route path="members" element={<Members />} />
+
                 {/* 🔒 SUBSCRIPTIONS (Blocked if 'None') */}
                 <Route element={<RequireSubscription />}>
                   <Route path="contributions" element={<Contributions />} />
                 </Route>
 
-                {/* --- Admin Only --- */}
-                <Route path="members" element={<ProtectedRoute role="admin"><Members /></ProtectedRoute>} />
+                {/* --- 🔒 ADMIN ONLY --- */}
+                {/* Regular members CANNOT see details page */}
                 <Route path="members/:memberId" element={<ProtectedRoute role="admin"><MemberDetails /></ProtectedRoute>} />
+                
                 <Route path="reports" element={<ProtectedRoute role="admin"><Reports /></ProtectedRoute>} />
                 <Route path="settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
                 <Route path="audit-logs" element={<ProtectedRoute role="admin"><AuditLogs /></ProtectedRoute>} />

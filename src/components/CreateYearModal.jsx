@@ -121,8 +121,8 @@ const onSubmit = async (data) => {
                <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Frequency</label>
                   <select {...register("frequency")} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-500">
-                    <option value="weekly">Weekly Subscription</option>
-                    <option value="monthly">Monthly Subscription</option>
+                    <option value="weekly">Weekly Collection</option>
+                    <option value="monthly">Monthly Collection</option>
                     <option value="none">No Recurring (Donations Only)</option>
                   </select>
                </div>

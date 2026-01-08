@@ -218,8 +218,8 @@ export default function DashboardHome() {
                    <>
                      <QuickActionBtn 
                        icon={<IndianRupee />} 
-                       label="Festival Chanda" 
-                       sub="Member Fee"
+                       label="Festival Fee" 
+                       sub="Member Contribution"
                        color="emerald"
                        onClick={() => setShowPuja(true)} 
                      />
@@ -245,7 +245,7 @@ export default function DashboardHome() {
                 {/* 1. Dynamic Subscription Card */}
                 {frequency && frequency !== 'none' && (
                   <BreakdownCard 
-                    label={frequency === 'weekly' ? 'Weekly Chanda' : 'Monthly Chanda'} 
+                    label={frequency === 'weekly' ? 'Weekly collection' : 'Monthly collection'} 
                     amount={data?.breakdown?.subscriptions} 
                     color="indigo" 
                   />
@@ -260,7 +260,7 @@ export default function DashboardHome() {
 
                 {/* 3. Member Fees */}
                 <BreakdownCard 
-                  label="Member Fees" 
+                  label="Member's Contribution" 
                   amount={data?.breakdown?.memberFees} 
                   color="emerald" 
                 />

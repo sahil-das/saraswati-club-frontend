@@ -132,8 +132,8 @@ export default function Settings() {
   };
 
   const getFrequencyLabel = (freq) => {
-    if (freq === 'weekly') return 'Weekly Subscription';
-    if (freq === 'monthly') return 'Monthly Subscription';
+    if (freq === 'weekly') return 'Weekly Collection';
+    if (freq === 'monthly') return 'Monthly Collection';
     return 'Donation Based (No Recurring)';
   };
 

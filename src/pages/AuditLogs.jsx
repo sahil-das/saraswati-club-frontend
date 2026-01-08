@@ -3,35 +3,75 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { exportAuditLogsPDF } from "../utils/pdfExport"; 
 import { 
-  Loader2, Shield, Clock, User, Activity, Filter, ChevronLeft, ChevronRight, Download 
+  Loader2, Shield, Clock, User, Activity, Filter, ChevronLeft, ChevronRight, Download, Calendar
 } from "lucide-react"; 
 
 export default function AuditLogs() {
   const { activeClub } = useAuth(); 
   const [logs, setLogs] = useState([]);
+  const [years, setYears] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false); // ✅ NEW: Export Loading State
+  const [exporting, setExporting] = useState(false);
   
   // Filter States
   const [filters, setFilters] = useState({
     action: "ALL",
     startDate: "",
-    endDate: ""
+    endDate: "",
+    festivalYearId: "", 
+    lastMonths: "1" // Default fallback if no active year found
   });
+
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
+  // 1. Fetch Festival Years & Set Active Year as Default
+  useEffect(() => {
+    const fetchYears = async () => {
+        try {
+            // ✅ Ensure this matches your Backend Route (usually /years)
+            const res = await api.get("/years"); 
+            if (res.data.success && Array.isArray(res.data.data)) {
+                setYears(res.data.data);
+                
+                // Set active year as default
+                try {
+                    const activeRes = await api.get("/years/active");
+                    const activeYear = activeRes.data.data;
+                    if (activeYear && activeYear._id) {
+                        setFilters(prev => ({ 
+                            ...prev, 
+                            festivalYearId: activeYear._id,
+                            lastMonths: "" // 👈 FIX: Clear 'Last 30 Days' so range isn't locked
+                        }));
+                    }
+                } catch (err) {
+                    console.error("Failed to load active year", err);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load years", err);
+        }
+    };
+    fetchYears();
+  }, []);
+
+  // 2. Fetch Logs
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const query = new URLSearchParams({
+      const queryParams = {
         page: pagination.page,
-        limit: 15, // View Limit
+        limit: 15,
         ...(filters.action !== "ALL" && { action: filters.action }),
         ...(filters.startDate && { startDate: filters.startDate }),
         ...(filters.endDate && { endDate: filters.endDate }),
-      });
+        ...(filters.festivalYearId && { festivalYearId: filters.festivalYearId }),
+        ...(filters.lastMonths && { lastMonths: filters.lastMonths }),
+      };
 
+      const query = new URLSearchParams(queryParams);
       const res = await api.get(`/audit?${query.toString()}`);
+      
       setLogs(res.data.data);
       setPagination(prev => ({ ...prev, ...res.data.pagination }));
     } catch (err) {
@@ -46,46 +86,120 @@ export default function AuditLogs() {
   }, [pagination.page, filters]);
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    let newFilters = { ...filters, [key]: value };
+
+    // Clear conflicting filters logic
+    if (key === 'festivalYearId' && value) {
+        newFilters.startDate = '';
+        newFilters.endDate = '';
+        newFilters.lastMonths = '';
+    } 
+    else if (key === 'lastMonths' && value) {
+        newFilters.startDate = '';
+        newFilters.endDate = '';
+        newFilters.festivalYearId = '';
+    }
+    else if ((key === 'startDate' || key === 'endDate') && value) {
+        newFilters.festivalYearId = '';
+        newFilters.lastMonths = '';
+        
+        if (key === 'startDate' && newFilters.endDate) {
+            const start = new Date(value);
+            const end = new Date(newFilters.endDate);
+            const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
+            if (diffDays > 90) newFilters.endDate = ''; 
+        }
+    }
+
+    setFilters(newFilters);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  // ✅ FIXED: Fetch ALL logs for Export
+  const getMaxEndDate = () => {
+    if (!filters.startDate) return undefined;
+    const date = new Date(filters.startDate);
+    date.setDate(date.getDate() + 90);
+    return date.toISOString().split('T')[0];
+  };
+
+  const sanitizeLogsForExport = (logList) => {
+    const hiddenFields = [
+        "subscriptionId", "installment", "memberId", "userId", 
+        "expenseId", "club", "__v", "_id", "createdAt", "updatedAt"
+    ];
+
+    return logList.map(log => {
+        const cleanDetails = {};
+        if (log.details) {
+            Object.entries(log.details).forEach(([key, val]) => {
+                if (!hiddenFields.includes(key)) {
+                    cleanDetails[key] = val;
+                }
+            });
+        }
+        return { ...log, details: cleanDetails };
+    });
+  };
+
+  const getExportHeader = () => {
+    if (filters.festivalYearId) {
+        const y = years.find(y => y._id === filters.festivalYearId);
+        if (y) return `Cycle: ${y.name} (${new Date(y.startDate).toLocaleDateString()} - ${new Date(y.endDate).toLocaleDateString()})`;
+    }
+
+    if (filters.startDate && filters.endDate) {
+        const start = new Date(filters.startDate);
+        const end = new Date(filters.endDate);
+        const rangeStr = `${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+
+        const matchingYear = years.find(y => 
+            start >= new Date(y.startDate) && end <= new Date(y.endDate)
+        );
+        
+        if (matchingYear) {
+            return `${rangeStr} (Cycle: ${matchingYear.name})`;
+        }
+        return rangeStr;
+    }
+
+    if (filters.lastMonths) return `Last ${filters.lastMonths} Months`;
+
+    return "All Time";
+  };
+
   const handleExport = async () => {
     setExporting(true);
     try {
-      // 1. Create a query that fetches EVERYTHING (Limit 10,000)
-      const query = new URLSearchParams({
+      const queryParams = {
         page: 1,      
-        limit: 10000, // 👈 Fetches all records matching filters
+        limit: 10000, 
         ...(filters.action !== "ALL" && { action: filters.action }),
         ...(filters.startDate && { startDate: filters.startDate }),
         ...(filters.endDate && { endDate: filters.endDate }),
-      });
-
-      // 2. Call API
+        ...(filters.festivalYearId && { festivalYearId: filters.festivalYearId }),
+        ...(filters.lastMonths && { lastMonths: filters.lastMonths }),
+      };
+      
+      const query = new URLSearchParams(queryParams);
       const res = await api.get(`/audit?${query.toString()}`);
-      const fullLogList = res.data.data;
-
-      if (!fullLogList || fullLogList.length === 0) {
+      
+      if (!res.data.data || res.data.data.length === 0) {
         alert("No logs to export.");
         return;
       }
 
-      // 3. Generate PDF with the FULL list
-      const periodStr = filters.startDate && filters.endDate 
-          ? `${new Date(filters.startDate).toLocaleDateString()} to ${new Date(filters.endDate).toLocaleDateString()}` 
-          : "All Time";
+      const cleanLogs = sanitizeLogsForExport(res.data.data);
+      const headerText = getExportHeader();
 
       exportAuditLogsPDF({
           clubName: activeClub?.clubName,
-          logs: fullLogList, // ✅ Now passes all records, not just the visible 15
-          period: periodStr
+          logs: cleanLogs, 
+          period: headerText
       });
 
     } catch (err) {
       console.error("Export failed", err);
-      alert("Failed to export logs. Please try again.");
+      alert("Failed to export logs.");
     } finally {
       setExporting(false);
     }
@@ -106,7 +220,6 @@ export default function AuditLogs() {
           </div>
         </div>
 
-        {/* ✅ EXPORT BUTTON AREA */}
         <div className="flex items-center gap-3">
            <div className="text-right text-sm text-gray-500 hidden sm:block">
              Total Records: <span className="font-bold text-indigo-600">{pagination.total}</span>
@@ -127,53 +240,95 @@ export default function AuditLogs() {
       </div>
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end md:items-center">
-        <div className="w-full md:w-auto">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4">
+        
+        {/* Action Type */}
+        <div>
           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Action Type</label>
           <select 
-            className="w-full md:w-48 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             value={filters.action}
             onChange={(e) => handleFilterChange("action", e.target.value)}
           >
             <option value="ALL">All Actions</option>
             <option value="YEAR_UPDATED">Settings Updated</option>
             <option value="PAYMENT_COLLECTED">Payment Collected</option>
+            <option value="SUBSCRIPTION_PAY">Installment Paid</option>
+            <option value="SUBSCRIPTION_UNDO">Payment Reverted</option>
             <option value="CREATE_EXPENSE_REQUEST">Expense Request</option>
             <option value="EXPENSE_APPROVED">Expense Approved</option>
-            <option value="DELETE_EXPENSE">Expense Deleted</option>
             <option value="MEMBER_REMOVED">Member Removed</option>
           </select>
         </div>
 
-        <div className="w-full md:w-auto">
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Start Date</label>
-          <input 
-            type="date" 
-            className="w-full md:w-40 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-            value={filters.startDate}
-            onChange={(e) => handleFilterChange("startDate", e.target.value)}
-          />
+        {/* Quick Range (FIXED: Removed 'disabled') */}
+        <div>
+            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Quick Range</label>
+            <select 
+                className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                value={filters.lastMonths}
+                onChange={(e) => handleFilterChange("lastMonths", e.target.value)}
+                // 🛑 DISABLED PROP REMOVED HERE so user can click it to switch
+            >
+                <option value="">Select Range...</option>
+                <option value="1">Last 30 Days</option>
+                <option value="3">Last 3 Months</option>
+            </select>
         </div>
 
-        <div className="w-full md:w-auto">
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">End Date</label>
-          <input 
-            type="date" 
-            className="w-full md:w-40 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-            value={filters.endDate}
-            onChange={(e) => handleFilterChange("endDate", e.target.value)}
-          />
+        {/* Festival Year (FIXED: Removed 'disabled') */}
+        <div>
+            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Festival Cycle</label>
+            <select 
+                className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                value={filters.festivalYearId}
+                onChange={(e) => handleFilterChange("festivalYearId", e.target.value)}
+                 // 🛑 DISABLED PROP REMOVED HERE
+            >
+                <option value="">All Cycles</option>
+                {years.map(y => (
+                    <option key={y._id} value={y._id}>{y.name}</option>
+                ))}
+            </select>
         </div>
 
-        <button 
-          onClick={() => setFilters({ action: "ALL", startDate: "", endDate: "" })}
-          className="ml-auto px-4 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition"
-        >
-          Reset Filters
-        </button>
+        {/* Reset */}
+        <div className="flex items-end">
+            <button 
+                onClick={() => setFilters({ action: "ALL", startDate: "", endDate: "", festivalYearId: filters.festivalYearId, lastMonths: "" })}
+                className="w-full px-4 py-2 text-sm text-red-500 border border-red-200 hover:bg-red-50 rounded-lg transition font-medium"
+            >
+                Reset Filters
+            </button>
+        </div>
+
+        {/* Manual Date */}
+        <div className="md:col-span-4 flex gap-4 items-center pt-2 border-t border-dashed mt-2">
+            <span className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
+                <Calendar size={12}/> Custom Date Override (Max 3 Months):
+            </span>
+            <input 
+                type="date" 
+                className="p-1.5 border rounded-md text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                value={filters.startDate}
+                max={filters.endDate || undefined}
+                onChange={(e) => handleFilterChange("startDate", e.target.value)}
+            />
+            <span className="text-gray-400">-</span>
+            <input 
+                type="date" 
+                className="p-1.5 border rounded-md text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                value={filters.endDate}
+                min={filters.startDate || undefined}
+                max={getMaxEndDate()}
+                onChange={(e) => handleFilterChange("endDate", e.target.value)}
+                disabled={!filters.startDate} // Keep this disabled until start date is picked
+            />
+        </div>
+
       </div>
 
-      {/* LOGS LIST */}
+      {/* LOGS LIST (No changes needed here) */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px]">
         {loading ? (
           <div className="flex justify-center items-center h-64 text-indigo-600">
@@ -188,22 +343,14 @@ export default function AuditLogs() {
           <div className="divide-y divide-gray-50">
             {logs.map((log) => (
               <div key={log._id} className="p-5 hover:bg-gray-50 transition-colors flex gap-4 group">
-                
-                {/* Icon */}
                 <div className={`mt-1 p-2 rounded-lg shrink-0 h-fit ${getActionColor(log.action)}`}>
                    <Activity size={18} />
                 </div>
-
-                {/* Main Content */}
                 <div className="flex-1">
                    <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-bold text-gray-800 text-sm">
-                          {formatAction(log.action)}
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-0.5">
-                          {log.target}
-                        </p>
+                        <h4 className="font-bold text-gray-800 text-sm">{formatAction(log.action)}</h4>
+                        <p className="text-sm text-gray-600 mt-0.5">{log.target}</p>
                       </div>
                       <span className="text-xs font-mono text-gray-400 whitespace-nowrap flex items-center gap-1">
                         <Clock size={12}/> 
@@ -211,15 +358,11 @@ export default function AuditLogs() {
                         <span className="hidden sm:inline"> {new Date(log.createdAt).toLocaleTimeString()}</span>
                       </span>
                    </div>
-
-                   {/* User & Details */}
                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
                       <div className="flex items-center gap-2 text-gray-500 bg-gray-100 px-2 py-1 rounded-md w-fit">
                         <User size={12} />
                         <span className="font-medium">{log.actor?.name || "System"}</span>
                       </div>
-                      
-                      {/* Details Renderer */}
                       {log.details && Object.keys(log.details).length > 0 && (
                         <div className="flex flex-wrap gap-2 items-center">
                            {renderDetails(log.details)}
@@ -227,7 +370,6 @@ export default function AuditLogs() {
                       )}
                    </div>
                 </div>
-
               </div>
             ))}
           </div>
@@ -256,15 +398,11 @@ export default function AuditLogs() {
           </button>
         </div>
       )}
-
     </div>
   );
 }
 
-// ----------------------------------------------------------------------
-// HELPER FUNCTIONS
-// ----------------------------------------------------------------------
-
+// HELPERS
 function formatAction(action) {
   return action?.replace(/_/g, " ")?.toLowerCase()
     .split(' ')
@@ -274,7 +412,7 @@ function formatAction(action) {
 
 function getActionColor(action) {
   const a = action?.toLowerCase() || "";
-  if (a.includes("delete") || a.includes("remove") || a.includes("reject")) return "bg-red-100 text-red-600";
+  if (a.includes("delete") || a.includes("remove") || a.includes("reject") || a.includes("undo")) return "bg-red-100 text-red-600";
   if (a.includes("update") || a.includes("edit")) return "bg-orange-100 text-orange-600";
   if (a.includes("create") || a.includes("add") || a.includes("approve") || a.includes("start")) return "bg-emerald-100 text-emerald-600";
   if (a.includes("pay") || a.includes("fee") || a.includes("collect")) return "bg-indigo-100 text-indigo-600";
@@ -282,19 +420,21 @@ function getActionColor(action) {
 }
 
 function renderDetails(details) {
-  const ignoredKeys = ["expenseId", "memberId", "userId", "_id", "club"];
+  const ignoredKeys = [
+      "expenseId", "memberId", "userId", "_id", "club", 
+      "subscriptionId", "installment", "__v", "createdAt", "updatedAt",
+      "memberName"
+  ];
 
   return Object.entries(details).map(([key, value]) => {
     if (ignoredKeys.includes(key) || value === null || value === undefined) return null;
 
-    // Hide 'totalWeeks' if frequency is not weekly
     if (key === "totalWeeks") {
       const freq = details.frequency || details.newFreq; 
       if (freq && freq !== "weekly") return null; 
     }
 
     const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-
     let displayValue = value;
     if (key.toLowerCase().includes("amount") || key.toLowerCase().includes("balance")) {
       displayValue = `₹${value}`;

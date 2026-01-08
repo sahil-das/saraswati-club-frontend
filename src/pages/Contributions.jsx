@@ -75,7 +75,6 @@ export default function Contributions() {
 
   /* ================= ACTIONS ================= */
   
-  // 🚨 FIX: Wrap values in Number() to prevent String Concatenation ("200.00" + "200.00")
   const totalCollected = members.reduce((sum, m) => {
     return sum + Number(m.subscription?.totalPaid || 0);
   }, 0);
@@ -83,10 +82,9 @@ export default function Contributions() {
   const toggleExpand = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const handlePayment = async (memberId, subscriptionId, installmentNumber) => {
-      // 1. Guard Clauses
+      // 1. Guard Clauses (Security)
       if (activeClub?.role !== "admin") return;
       
-      // Fix: Only block if THIS specific item is already processing
       const processKey = `${memberId}-${installmentNumber}`;
       if (processing === processKey) return; 
 
@@ -105,31 +103,17 @@ export default function Contributions() {
             ? { 
                 ...m, 
                 subscription: res.data.data, 
-                error: null // Clear specific error messages if you have a field for them
+                error: null 
               } 
             : m
         ));
         
-        // 3. Refresh Global Stats
-        // await is optional here depending on if you want the UI to wait for this
-        fetchCentralFund(); 
+        await fetchCentralFund(); 
 
       } catch (err) {
         const errorMessage = err.response?.data?.message || err.message;
-        
-        // Option A: Alert (Simple)
         alert(`Payment failed: ${errorMessage}`);
-
-        // Option B: Set error state on the specific member (Better UX)
-        /*
-        setMembers((prev) => prev.map((m) => 
-          m.membershipId === memberId ? { ...m, error: errorMessage } : m
-        ));
-        */
-
       } finally {
-        // 4. Cleanup
-        // Only clear if it matches the current process (prevents race conditions)
         setProcessing((prev) => (prev === processKey ? null : prev));
       }
   };
@@ -164,13 +148,12 @@ export default function Contributions() {
                 totalWeeks: cycle.totalInstallments,
                 weeklyAmount: cycle.amountPerInstallment
             },
-            frequency: cycle.subscriptionFrequency // 'weekly' or 'monthly'
+            frequency: cycle.subscriptionFrequency 
         });
   };
 
-  const visibleMembers = activeClub?.role === "admin" 
-      ? members 
-      : members.filter(m => m.email === user.email);
+  // ✅ VISIBILITY UNLOCKED: Everyone sees all members
+  const visibleMembers = members; 
 
   const getLabel = (num) => {
     if (cycle?.subscriptionFrequency === 'monthly') {
@@ -196,7 +179,7 @@ export default function Contributions() {
                <CalendarRange size={24} />
              </div>
              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-               {cycle.subscriptionFrequency === 'monthly' ? "Monthly Chanda" : "Weekly Chanda"}
+               {cycle.subscriptionFrequency === 'monthly' ? "Monthly collection" : "Weekly collection"}
              </h1>
            </div>
            <p className="text-slate-500 text-sm ml-1">
@@ -207,24 +190,22 @@ export default function Contributions() {
         <div className="flex gap-4 w-full md:w-auto">
              <StatBadge 
                label="Collected" 
-               // toLocaleString works correctly on the Number we calculated above
                value={`₹ ${totalCollected.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
                icon={IndianRupee} 
                color="emerald"
              />
              <StatBadge 
                label="Rate" 
-               // Ensure this is also displayed correctly
                value={`₹ ${Number(cycle.amountPerInstallment).toFixed(0)}`} 
                sub={`/${cycle.subscriptionFrequency.slice(0, 3)}`}
                icon={CreditCard} 
                color="blue"
              />
-             {activeClub?.role === "admin" && (
-                <Button variant="secondary" onClick={handleExport} className="h-auto">
-                   <Download size={18} />
-                </Button>
-             )}
+             
+             {/* ✅ Export is Read-Only, so we can show it to everyone (Optional) */}
+             <Button variant="secondary" onClick={handleExport} className="h-auto">
+                <Download size={18} />
+             </Button>
         </div>
       </div>
 
@@ -241,9 +222,12 @@ export default function Contributions() {
                             <p className="text-xs text-red-400">Subscription data unavailable</p>
                         </div>
                     </div>
-                    <Button size="sm" variant="secondary" onClick={() => retrySubscription(m)}>
-                        <RefreshCw size={14} className="mr-2"/> Retry
-                    </Button>
+                    {/* Only Admin can retry to avoid spamming API */}
+                    {activeClub?.role === "admin" && (
+                        <Button size="sm" variant="secondary" onClick={() => retrySubscription(m)}>
+                            <RefreshCw size={14} className="mr-2"/> Retry
+                        </Button>
+                    )}
                 </div>
               );
           }
@@ -307,11 +291,13 @@ export default function Contributions() {
                     <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-2">
                         {m.subscription.installments.map((inst) => {
                             const isProcessing = processing === `${m.membershipId}-${inst.number}`;
+                            const isAdmin = activeClub?.role === 'admin';
                             
                             return (
                                 <button
                                     key={inst.number}
-                                    disabled={activeClub?.role !== 'admin' || isProcessing}
+                                    // 🔒 DISABLED if not admin OR if processing
+                                    disabled={!isAdmin || isProcessing}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handlePayment(m.membershipId, m.subscription._id, inst.number);
@@ -320,9 +306,15 @@ export default function Contributions() {
                                         "h-10 rounded-lg border text-[10px] font-bold transition-all duration-200 flex items-center justify-center relative",
                                         inst.isPaid 
                                             ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
-                                            : "bg-white border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-600",
-                                        isProcessing && "opacity-50 cursor-wait",
-                                        activeClub?.role !== 'admin' && !inst.isPaid && "opacity-50 cursor-not-allowed bg-slate-50"
+                                            : "bg-white border-slate-200 text-slate-400",
+                                        
+                                        // Interactive styles ONLY for Admins
+                                        isAdmin && !inst.isPaid && "hover:border-indigo-300 hover:text-indigo-600",
+                                        
+                                        // Read-only visual cues for Members
+                                        !isAdmin && "opacity-80 cursor-default",
+                                        
+                                        isProcessing && "opacity-50 cursor-wait"
                                     )}
                                 >
                                     {inst.isPaid ? <Check size={14} strokeWidth={3} /> : getLabel(inst.number)}
@@ -351,7 +343,7 @@ function StatBadge({ label, value, sub, icon: Icon, color }) {
         <div className={`flex flex-col items-end px-4 py-2 rounded-xl border ${colors[color]}`}>
             <div className="flex items-center gap-1 opacity-80 mb-1">
                 <Icon size={12} />
-                <span className="text-[10px] uppercase font-bold tracking-wider">{label}</span>
+                <span className="text-xs uppercase font-bold tracking-wider">{label}</span>
             </div>
             <div className="text-lg font-bold leading-none">
                 {value}<span className="text-xs opacity-70 font-medium">{sub}</span>

@@ -25,7 +25,7 @@ const NAV_ITEMS = [
     roles: ["admin", "member"]
   },
   { 
-    label: "Puja Chanda", 
+    label: "Member's Donaiton", 
     path: "/puja-contributions", 
     icon: Sparkles,
     roles: ["admin", "member"] 

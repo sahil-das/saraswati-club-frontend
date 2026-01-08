@@ -20,7 +20,12 @@ export default function AddDonationModal({ onClose, refresh }) {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await createDonation({ ...data, amount: Number(data.amount) });
+      // Remove optional empty fields so backend won't reject empty strings
+      const payload = { ...data, amount: Number(data.amount) };
+      if (!payload.phone) delete payload.phone;
+      if (!payload.receiptNo) delete payload.receiptNo;
+
+      await createDonation(payload);
       toast.success("Donation recorded successfully!");
       if (refresh) refresh();
       handleClose();

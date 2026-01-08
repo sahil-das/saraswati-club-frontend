@@ -24,11 +24,49 @@ export default function Login() {
     setError(null);
 
     try {
-      const clubs = await login(input, password);
+      const result = await login(input, password);
+      // `login` returns an object: { user, clubs }
+      const clubs = (result && result.clubs) || [];
       if (clubs && clubs.length === 1) selectClub(clubs[0]);
       navigate("/");
     } catch (err) {
-      setError("Invalid credentials. Please double-check your ID and password.");
+      // Distinguish error types for better UX
+      if (err?.response) {
+        const status = err.response.status;
+        const data = err.response.data || {};
+        const serverMessage = data.message || data.error || null;
+
+        switch (status) {
+          case 400:
+            setError(serverMessage || "Bad request. Please check your input.");
+            break;
+          case 401:
+            setError(serverMessage || "Invalid credentials. Please double-check your ID and password.");
+            break;
+          case 403:
+            setError(serverMessage || "Access forbidden. Your account may be disabled.");
+            break;
+          case 404:
+            setError(serverMessage || "Account not found. Please register first.");
+            break;
+          case 422:
+            setError(serverMessage || "Validation failed. Please check the form fields.");
+            break;
+          case 429:
+            setError(serverMessage || "Too many attempts. Please try again later.");
+            break;
+          case 500:
+          default:
+            setError(serverMessage || "Server error. Please try again later.");
+            break;
+        }
+      } else if (err?.request) {
+        // request made but no response
+        setError("No response from server. Check your network connection.");
+      } else {
+        // something happened setting up the request
+        setError(err.message || "An unknown error occurred.");
+      }
     } finally {
       setLoading(false);
     }

@@ -242,7 +242,7 @@ export default function PujaContributions() {
                 <Sparkles size={24} />
              </div>
              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Festival Chanda</h1>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Member's Contribution</h1>
                 <p className="text-slate-500 text-sm font-medium">
                     Collection for <span className="font-bold text-slate-700">{activeYear?.name || "Active Festival"}</span>
                 </p>
