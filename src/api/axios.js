@@ -1,7 +1,6 @@
 import axios from "axios";
 
 // 🚨 SAFETY FIX: Do not default to localhost in production.
-// This forces you to set VITE_API_URL in your Netlify/Vercel/Docker config.
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 if (!BASE_URL) {
@@ -55,6 +54,18 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // ---------------------------------------------------------
+    // 🚨 CRITICAL FIX STARTS HERE
+    // ---------------------------------------------------------
+    // Ignore 401s specifically from the login endpoint.
+    // "Wrong Password" is NOT the same as "Expired Token".
+    if (originalRequest.url.includes("/login")) {
+        return Promise.reject(error);
+    }
+    // ---------------------------------------------------------
+    // 🚨 CRITICAL FIX ENDS HERE
+    // ---------------------------------------------------------
 
     // Handle 401 Unauthorized (Token Expired)
     if (error.response?.status === 401 && !originalRequest._retry) {
