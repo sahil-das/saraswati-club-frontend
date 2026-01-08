@@ -1,17 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
-import api from "../api/axios"; // Kept for year/active check only
+import api from "../api/axios"; 
 import { 
   fetchExpenses as getExpensesAPI, 
   approveExpense, 
   rejectExpense, 
-  deleteExpense,
-  createExpense 
-} from "../api/expenses"; // 👈 Imported API functions
+  deleteExpense
+} from "../api/expenses"; 
 import { useAuth } from "../context/AuthContext";
 import { 
-  Plus, Search, CheckCircle, XCircle, Clock, Loader2, 
-  IndianRupee, AlertCircle, Lock, Download, Trash2, 
-  FileText, Calendar, Filter, ChevronDown 
+  Plus, Search, CheckCircle, XCircle, Clock, Loader2, Download, Trash2,
+  FileText, Calendar, Filter, ChevronDown, Lock, PlusCircle, AlertCircle
 } from "lucide-react";
 
 // Design System & Components
@@ -20,6 +18,7 @@ import { Card } from "../components/ui/Card";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 import AddExpenseModal from "../components/AddExpenseModal"; 
+import CreateYearModal from "../components/CreateYearModal"; // 👈 Import Create Year Modal
 import { exportExpensesPDF } from "../utils/pdfExport"; 
 
 const CATEGORIES = ["Pandal", "Idol", "Light & Sound", "Food/Bhog", "Priest/Puja", "Transport", "Miscellaneous"];
@@ -31,6 +30,7 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreateYear, setShowCreateYear] = useState(false); // 👈 State for Create Year
   const [searchTerm, setSearchTerm] = useState("");
   const [cycle, setCycle] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -39,20 +39,29 @@ export default function Expenses() {
 
   const loadExpenses = async () => {
     try {
-      // Keep this direct call or move to api/years.js if preferred
-      const yearRes = await api.get("/years/active");
-      const activeYear = yearRes.data.data;
+      setLoading(true);
+
+      // 1. CHECK ACTIVE YEAR FIRST
+      let activeYear = null;
+      try {
+          const yearRes = await api.get("/years/active");
+          activeYear = yearRes.data.data;
+      } catch (e) {
+          activeYear = null;
+      }
       
+      setCycle(activeYear);
+
+      // 🛑 STOP IF YEAR IS CLOSED
       if (!activeYear) {
         setLoading(false);
         return;
       }
-
-      setCycle(activeYear);
       
-      // 👇 Using centralized API function
+      // 2. FETCH EXPENSES (Only if year is open)
       const res = await getExpensesAPI();
       setExpenses(res.data.data);
+
     } catch (err) {
       console.error(err);
       toast.error("Failed to load expenses");
@@ -62,13 +71,12 @@ export default function Expenses() {
   };
 
   useEffect(() => {
-    loadExpenses();
+    if (activeClub) loadExpenses();
   }, [activeClub]);
 
   const handleStatus = async (id, newStatus) => {
     if (activeClub?.role !== "admin") return;
     try {
-      // 👇 Using centralized API functions
       if (newStatus === "approved") {
         await approveExpense(id);
       } else {
@@ -88,7 +96,6 @@ export default function Expenses() {
 
   const handleDelete = async () => {
     try {
-      // 👇 Using centralized API function
       await deleteExpense(confirmDelete.id);
       setExpenses(prev => prev.filter(e => e._id !== confirmDelete.id));
       toast.success("Expense record deleted");
@@ -111,9 +118,48 @@ export default function Expenses() {
     .filter(e => e.status === "approved")
     .reduce((sum, e) => sum + Number(e.amount), 0);
 
-  if (loading) return <LoadingState />;
-  if (!cycle) return <NoCycleState isAdmin={activeClub?.role === "admin"} />;
+  if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-indigo-600"><Loader2 className="animate-spin w-10 h-10"/></div>;
 
+  // 🔒 CLOSED YEAR STATE
+  if (!cycle) {
+      if (activeClub?.role === 'admin') {
+          return (
+              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 animate-in fade-in">
+                  <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+                      <PlusCircle size={32} className="text-indigo-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800">No Active Budget</h2>
+                  <p className="text-slate-500 max-w-md mt-3 mb-8 leading-relaxed">
+                      You need to start a new financial year to record and manage expenses.
+                  </p>
+                  <Button onClick={() => setShowCreateYear(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200">
+                      <PlusCircle size={18} className="mr-2" /> Start New Year
+                  </Button>
+                  
+                  {/* Reuse the Create Year Modal */}
+                  {showCreateYear && (
+                    <CreateYearModal 
+                        onSuccess={() => { setShowCreateYear(false); loadExpenses(); }} 
+                        onClose={() => setShowCreateYear(false)} 
+                    />
+                  )}
+              </div>
+          );
+      }
+      return (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-slate-200 animate-in fade-in">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+                  <Lock size={32} className="text-slate-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-700">Expenses Locked</h2>
+              <p className="text-slate-500 max-w-md mt-2">
+                  Expenses cannot be viewed or added until the new financial year begins.
+              </p>
+          </div>
+      );
+  }
+
+  // 🔓 OPEN YEAR STATE
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
       
@@ -149,7 +195,7 @@ export default function Expenses() {
         </div>
       </div>
 
-      {/* 2. TOOLBAR - ❌ Removed 'sticky top-20' so it moves up when scrolling */}
+      {/* 2. TOOLBAR */}
       <Card noPadding className="shadow-sm border-slate-200">
         <div className="p-3 md:p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-72">
@@ -294,7 +340,7 @@ export default function Expenses() {
   );
 }
 
-// ... Subcomponents (StatusBadge, LoadingState, NoCycleState) remain the same ...
+// Subcomponent: Status Badge
 function StatusBadge({ status }) {
     const styles = {
         pending: "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500/20",
@@ -308,27 +354,5 @@ function StatusBadge({ status }) {
             <Icon size={10} strokeWidth={3} />
             {status}
         </span>
-    );
-}
-
-function LoadingState() {
-    return (
-        <div className="min-h-[60vh] flex items-center justify-center text-indigo-600">
-            <Loader2 className="animate-spin w-10 h-10"/>
-        </div>
-    );
-}
-
-function NoCycleState({ isAdmin }) {
-    return (
-        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
-            <div className="bg-slate-100 p-6 rounded-3xl mb-6 shadow-inner">
-                {isAdmin ? <AlertCircle className="w-12 h-12 text-slate-400" /> : <Lock className="w-12 h-12 text-slate-400" />}
-            </div>
-            <h2 className="text-2xl font-bold text-slate-800">No Active Budget</h2>
-            <p className="text-slate-500 max-w-md mt-2 leading-relaxed">
-                {isAdmin ? "You haven't started a new financial cycle yet." : "Expenses are locked until the new year begins."}
-            </p>
-        </div>
     );
 }

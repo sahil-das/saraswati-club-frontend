@@ -4,9 +4,9 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { 
-  Phone, Calendar, Shield, ArrowLeft, Loader2, Plus, 
+  Phone, Calendar, Shield, ArrowLeft, Loader2, Plus, Download,
   CheckCircle, IndianRupee, CreditCard, AlertCircle, 
-  Mail, Hash, ShieldCheck, Lock, Sparkles
+  Mail, Hash, ShieldCheck, Lock, ChevronDown, ChevronUp
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -19,36 +19,37 @@ import AddPujaModal from "../components/AddPujaModal";
 // 🛠 HELPER: Handle both Paisa Integers (20000) and Rupee Strings ("200.00")
 const parseAmount = (val) => {
     if (!val) return 0;
-    // If backend returns number (20000), it's Paisa -> Divide
-    if (typeof val === 'number') {
-        return val / 100;
-    }
-    // If backend returns string "200.00", it's Rupees -> Parse
+    if (typeof val === 'number') return val / 100;
     return Number(val) || 0;
 };
 
 export default function MemberDetails() {
-  const { memberId } = useParams();
+  const { memberId } = useParams(); 
   const navigate = useNavigate();
   const { activeClub } = useAuth();
   const toast = useToast();
-  
+   
   const [loading, setLoading] = useState(true);
   const [isYearClosed, setIsYearClosed] = useState(false);
-  
+   
   const [member, setMember] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [frequency, setFrequency] = useState("weekly"); 
   const [chandaHistory, setChandaHistory] = useState([]);
   const [stats, setStats] = useState({ subPaid: 0, subDue: 0, chandaPaid: 0 });
-  
+   
   const [showChandaModal, setShowChandaModal] = useState(false);
   const [confirmPayment, setConfirmPayment] = useState({ isOpen: false, inst: null });
 
+  // Mobile Collapse State
+  const [isExpanded, setIsExpanded] = useState(true);
+
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-  // FETCH DATA
   const fetchData = async () => {
+    // 🔒 Local variable to track status Synchronously
+    let isClosedLocal = false;
+
     try {
       setLoading(true);
 
@@ -56,42 +57,52 @@ export default function MemberDetails() {
       try {
         const yearRes = await api.get("/years/active");
         if (!yearRes.data.data) {
-           setIsYearClosed(true);
+            isClosedLocal = true;
+            setIsYearClosed(true);
         }
       } catch (e) {
+         // 404 means no active year
+         isClosedLocal = true;
          setIsYearClosed(true);
       }
-      
-      // 2. Fetch Subscription & Basic Info
+       
+      // 2. Fetch Member & Subscription
+      // (This now works even if year is closed, thanks to your backend fix)
       const subRes = await api.get(`/subscriptions/member/${memberId}`);
       const data = subRes.data.data;
-      
+       
       setMember({
-        id: memberId,
-        name: data.memberName || data.member?.name,
-        clubId: data.memberUserId || data.member?.userId || "N/A", 
+        id: memberId, 
+        name: data.member?.memberName || "Unnamed Member",
+        clubId: memberId, 
         role: data.member?.role || "member",
-        phone: data.phone || data.member?.phone || "No Phone",
-        email: data.email || data.member?.email || data.member?.personalEmail || "No Email",
-        joinedYear: data.year?.name
+        phone: data.member?.phone || "No Phone",
+        email: data.member?.email || "No Email",
+        personalEmail: data.member?.personalEmail || "N/A",
+        joinedYear: data.year?.name || "N/A"
       });
 
+      // If subscription is null (Year Closed), this is fine.
       setSubscription(data.subscription);
-      setFrequency(data.rules?.frequency || "weekly");
+      
+      // Default to weekly if year data is missing
+      setFrequency(data.year?.frequency || "weekly");
 
-      // 3. Fetch Puja Fees
-      if (!isYearClosed) {
+      // 3. Fetch Puja Fees (ONLY if Year is Open)
+      // We use isClosedLocal because state updates are async
+      if (!isClosedLocal) {
         try {
-            const userIdToFetch = data.memberUserId || data.member?.userId;
-            const feeRes = await api.get(`/member-fees/member/${userIdToFetch}`);
-            setChandaHistory(feeRes.data.data.records || []);
-            
-            // 🚨 FIX: Parse all amounts before setting state
-            setStats({
-              subPaid: parseAmount(data.subscription?.totalPaid),
-              subDue: parseAmount(data.subscription?.totalDue),
-              chandaPaid: parseAmount(feeRes.data.data.total)
-            });
+            const userIdToFetch = data.member?.userId;
+            if (userIdToFetch) {
+                  const feeRes = await api.get(`/member-fees/member/${userIdToFetch}`);
+                  setChandaHistory(feeRes.data.data.records || []);
+                  
+                  setStats({
+                    subPaid: parseAmount(data.subscription?.totalPaid),
+                    subDue: parseAmount(data.subscription?.totalDue),
+                    chandaPaid: parseAmount(feeRes.data.data.total)
+                  });
+            }
         } catch (e) {
             console.warn("Chanda fetch failed", e);
         }
@@ -99,9 +110,8 @@ export default function MemberDetails() {
 
     } catch (err) {
       console.error("Member Details Error:", err);
-      if (!isYearClosed) {
-         toast.error("Failed to load member data");
-      }
+      // Only show error toast if we expected data (Year Open) but failed
+      if (!isClosedLocal) toast.error("Failed to load member data");
     } finally {
       setLoading(false);
     }
@@ -111,23 +121,22 @@ export default function MemberDetails() {
     if (memberId && activeClub) fetchData();
   }, [memberId, activeClub]);
 
+  // ... (handleTogglePayment logic remains the same) ...
   const handleTogglePayment = async () => {
     const inst = confirmPayment.inst;
     if (!inst) return;
     try {
       const res = await api.post("/subscriptions/pay", {
         subscriptionId: subscription._id,
-        installmentNumber: inst.number
+        installmentNumber: inst.number,
+        memberId: memberId 
       });
       setSubscription(res.data.data);
-      
-      // 🚨 FIX: Parse response amounts
       setStats(prev => ({ 
           ...prev, 
           subPaid: parseAmount(res.data.data.totalPaid), 
           subDue: parseAmount(res.data.data.totalDue) 
       }));
-      
       toast.success("Payment status updated");
     } catch (err) {
       toast.error(err.response?.data?.message || "Update failed");
@@ -153,19 +162,16 @@ export default function MemberDetails() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20 animate-in fade-in duration-500">
-      
+       
       {/* 1. TOP BAR */}
       <div className="flex items-center gap-4">
-        <button 
-            onClick={() => navigate(-1)} 
-            className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-500 transition-all border border-transparent hover:border-slate-200"
-        >
+        <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-500 transition-all border border-transparent hover:border-slate-200">
             <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-slate-800 hidden md:block">Member Profile</h1>
       </div>
 
-      {/* 2. PROFILE BANNER */}
+      {/* 2. PROFILE BANNER (Always Visible) */}
       <div className="relative bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm group">
          <div className="absolute top-0 w-full h-32 bg-gradient-to-r from-indigo-900 to-slate-900 transition-all group-hover:scale-105 duration-700" />
          
@@ -192,15 +198,15 @@ export default function MemberDetails() {
                         <Phone size={14} className="text-slate-400 shrink-0"/> <span className="text-slate-700">{member.phone}</span>
                    </div>
                    <div className="flex items-center gap-2">
-                        <Hash size={14} className="text-slate-400 shrink-0"/> <span>ID: <span className="font-mono text-slate-700">{member.clubId}</span></span>
+                        <Hash size={14} className="text-slate-400 shrink-0"/> <span>User ID: <span className="font-mono text-slate-700">{member.email}</span></span>
                    </div>
                    <div className="flex items-center gap-2">
-                        <Mail size={14} className="text-slate-400 shrink-0"/> <span className="truncate max-w-[200px]">{member.email}</span>
+                        <Mail size={14} className="text-slate-400 shrink-0"/> <span className="truncate max-w-[200px]">{member.personalEmail}</span>
                    </div>
                 </div>
              </div>
 
-             {/* Actions */}
+             {/* Actions - Only Show if Year is OPEN */}
              <div className="flex gap-3 w-full md:w-auto mt-4 md:mt-0">
                  {!isYearClosed && activeClub?.role === "admin" && (
                     <Button onClick={() => setShowChandaModal(true)} leftIcon={<Plus size={18} />} className="shadow-lg shadow-indigo-200 w-full md:w-auto">
@@ -211,8 +217,9 @@ export default function MemberDetails() {
          </div>
       </div>
 
-      {/* 3. MAIN CONTENT */}
+      {/* 3. MAIN CONTENT (Conditional) */}
       {isYearClosed ? (
+        // 🔒 CLOSED YEAR STATE
         <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm ring-4 ring-slate-100">
               <Lock className="w-8 h-8 text-slate-400" />
@@ -229,22 +236,35 @@ export default function MemberDetails() {
            )}
         </div>
       ) : (
+        // 🔓 OPEN YEAR STATE
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
             {/* LEFT COLUMN: SUBSCRIPTION */}
             {frequency !== 'none' && (
             <div className="lg:col-span-2 space-y-6">
                 <Card>
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                        <CreditCard className="text-indigo-600" size={20} /> Subscription Status
-                        </h3>
-                        <p className="text-sm text-slate-500 mt-1">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                        <button 
+                          onClick={() => setIsExpanded(!isExpanded)} 
+                          className="w-full text-left focus:outline-none group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="text-indigo-600" size={20} /> 
+                            <span className="font-bold text-slate-800">Subscription Status</span>
+                            
+                            {/* Mobile Toggle Arrow */}
+                            <span className="md:hidden flex items-center justify-center text-slate-400 p-1 bg-slate-50 rounded-md border border-slate-100 group-active:scale-95 transition-transform">
+                                {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                            </span>
+                          </div>
+                          
+                          <p className="text-sm text-slate-500 mt-1 pl-7">
                             {frequency === 'monthly' ? 'Monthly' : 'Weekly'} Plan • <span className="font-bold text-slate-700">₹{parseAmount(subscription?.year?.amountPerInstallment)}</span> / period
-                        </p>
+                          </p>
+                        </button>
                     </div>
-                    <div className="text-right">
+
+                    <div className="text-right pl-4">
                         <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Paid</span>
                         <span className={clsx("text-2xl font-bold font-mono", progressPercent === 100 ? "text-emerald-600" : "text-indigo-600")}>
                             {progressPercent}%
@@ -252,31 +272,35 @@ export default function MemberDetails() {
                     </div>
                 </div>
 
-                <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden mb-6">
-                    <div className="h-full bg-indigo-600 transition-all duration-1000 ease-out rounded-full" style={{ width: `${progressPercent}%` }} />
-                </div>
+                {/* Collapsible Content */}
+                <div className={clsx("transition-all duration-300 overflow-hidden", isExpanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0 md:max-h-none md:opacity-100")}>
+                    
+                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden mb-6">
+                        <div className="h-full bg-indigo-600 transition-all duration-1000 ease-out rounded-full" style={{ width: `${progressPercent}%` }} />
+                    </div>
 
-                <div className={clsx("grid gap-3", frequency === 'monthly' ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6" : "grid-cols-5 sm:grid-cols-8 md:grid-cols-10")}>
-                    {subscription?.installments?.map((inst) => {
-                        const label = frequency === 'monthly' ? MONTHS[inst.number - 1] : `${inst.number}`;
-                        return (
-                        <button
-                            key={inst.number}
-                            onClick={() => setConfirmPayment({ isOpen: true, inst })}
-                            disabled={activeClub?.role !== "admin"}
-                            className={clsx(
-                            "relative flex flex-col items-center justify-center rounded-xl border transition-all duration-200 aspect-square",
-                            frequency === 'monthly' ? "py-4" : "py-2",
-                            inst.isPaid 
-                                ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200" 
-                                : "bg-white border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-600 hover:shadow-sm",
-                            activeClub?.role !== 'admin' && !inst.isPaid && "opacity-50 cursor-not-allowed bg-slate-50"
-                            )}
-                        >
-                            {inst.isPaid ? <CheckCircle size={frequency === 'monthly' ? 20 : 16} strokeWidth={3} /> : <span className={clsx("font-bold", frequency === 'monthly' ? "text-sm" : "text-xs")}>{label}</span>}
-                        </button>
-                        );
-                    })}
+                    <div className={clsx("grid gap-3", frequency === 'monthly' ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6" : "grid-cols-5 sm:grid-cols-8 md:grid-cols-10")}>
+                        {subscription?.installments?.map((inst) => {
+                            const label = frequency === 'monthly' ? MONTHS[inst.number - 1] : `${inst.number}`;
+                            return (
+                            <button
+                                key={inst.number}
+                                onClick={() => setConfirmPayment({ isOpen: true, inst })}
+                                disabled={activeClub?.role !== "admin"}
+                                className={clsx(
+                                "relative flex flex-col items-center justify-center rounded-xl border transition-all duration-200 aspect-square",
+                                frequency === 'monthly' ? "py-4" : "py-2",
+                                inst.isPaid 
+                                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200" 
+                                    : "bg-white border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-600 hover:shadow-sm",
+                                activeClub?.role !== 'admin' && !inst.isPaid && "opacity-50 cursor-not-allowed bg-slate-50"
+                                )}
+                            >
+                                {inst.isPaid ? <CheckCircle size={frequency === 'monthly' ? 20 : 16} strokeWidth={3} /> : <span className={clsx("font-bold", frequency === 'monthly' ? "text-sm" : "text-xs")}>{label}</span>}
+                            </button>
+                            );
+                        })}
+                    </div>
                 </div>
                 </Card>
             </div>
@@ -287,7 +311,6 @@ export default function MemberDetails() {
                 <div className="grid grid-cols-2 gap-4">
                     <Card noPadding className="bg-white border-slate-200 p-4">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Paid</p>
-                        {/* 🚨 FIX: toLocaleString on number */}
                         <p className="text-xl font-bold text-emerald-600 font-mono">₹{totalContribution.toLocaleString()}</p>
                     </Card>
                     {frequency !== 'none' && (
@@ -319,7 +342,6 @@ export default function MemberDetails() {
                                         <p className="text-sm font-bold text-slate-700">Festival Payment</p>
                                         <p className="text-[10px] text-slate-400">{new Date(fee.createdAt).toLocaleDateString()}</p>
                                     </div>
-                                    {/* 🚨 FIX: Parse individual fee amount */}
                                     <span className="text-sm font-bold font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">+ ₹{parseAmount(fee.amount)}</span>
                                 </div>
                                 {fee.notes && <p className="text-xs text-slate-400 mt-1 italic">"{fee.notes}"</p>}
@@ -329,6 +351,7 @@ export default function MemberDetails() {
                     )}
                 </Card>
 
+                {/* Contact Card */}
                 <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-lg">
                     <div className="flex items-center gap-4 mb-4">
                         <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
@@ -349,7 +372,7 @@ export default function MemberDetails() {
       )}
 
       {showChandaModal && !isYearClosed && (
-         <AddPujaModal onClose={() => setShowChandaModal(false)} refresh={fetchData} preSelectedMemberId={member.clubId} />
+         <AddPujaModal onClose={() => setShowChandaModal(false)} refresh={fetchData} preSelectedMemberId={memberId} />
       )}
 
       <ConfirmModal 

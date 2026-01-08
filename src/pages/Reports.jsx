@@ -8,7 +8,12 @@ import {
 import { 
   TrendingUp, TrendingDown, Wallet, IndianRupee, PieChart as PieIcon, Download, Loader2, AlertCircle 
 } from "lucide-react";
+<<<<<<< HEAD
 import { exportFinancialReportPDF } from "../utils/exportFinancialReportPDF"; 
+=======
+// ✅ UPDATED IMPORT: Using exportFinancePDF for Current Year Snapshot
+import { exportFinancePDF } from "../utils/pdfExport";
+>>>>>>> dashboardHome-work
 import { clsx } from "clsx"; 
 
 // Design System
@@ -17,6 +22,7 @@ import { Card } from "../components/ui/Card";
 
 // 🛠 HELPER: Safely convert API Strings ("50.00") or Paisa Integers (5000) to Number (50)
 const parseAmount = (val) => {
+<<<<<<< HEAD
     if (!val) return 0;
     // If it's a number and looks like Paisa (e.g., > 1000 without decimal), divide
     // NOTE: Backend should be sending "50.00" string now, so Number() handles it.
@@ -29,6 +35,11 @@ const parseAmount = (val) => {
     }
     // If string "50.00", convert to number
     return Number(val) || 0;
+=======
+  if (!val) return 0;
+  if (typeof val === 'number') return val; 
+  return Number(val) || 0;
+>>>>>>> dashboardHome-work
 };
 
 export default function Reports() {
@@ -102,7 +113,10 @@ export default function Reports() {
       const dateMap = {};
       [...pujaData, ...donationData].forEach(item => {
          const date = new Date(item.date || item.createdAt).toLocaleDateString("en-US", { month: 'short', day: 'numeric' });
+<<<<<<< HEAD
          // 🚨 FIX: Ensure addition is numeric
+=======
+>>>>>>> dashboardHome-work
          dateMap[date] = (dateMap[date] || 0) + parseAmount(item.amount);
       });
 
@@ -120,6 +134,7 @@ export default function Reports() {
     }
   };
 
+<<<<<<< HEAD
   const handleExport = () => {
     exportFinancialReportPDF({
       clubName: activeClub?.clubName || "Club Committee",
@@ -138,6 +153,24 @@ export default function Reports() {
         donations: donationList,
         puja: pujaList
       }
+=======
+  // ✅ UPDATED EXPORT HANDLER (Uses exportFinancePDF)
+  const handleExport = () => {
+    exportFinancePDF({
+      clubName: activeClub?.clubName || "Club Committee",
+      summary: [
+        { label: "Opening Balance", value: summary.opening },
+        { label: "Total Collected", value: summary.collected },
+        { label: "Total Expenses", value: summary.expenses },
+        { label: "Net Balance", value: summary.closing },
+      ],
+      contributions: contributions.map(c => ({
+        type: c.name,
+        amount: c.value
+      })),
+      // Pass all approved expenses for the detailed table in the snapshot
+      expenses: expenses.filter(e => e.status === "approved")
+>>>>>>> dashboardHome-work
     });
   };
 
@@ -156,7 +189,6 @@ export default function Reports() {
   // Data for Charts
   const expenseCategories = {};
   expenses.filter(e => e.status === "approved").forEach(e => {
-    // 🚨 FIX: Numeric Addition
     expenseCategories[e.category] = (expenseCategories[e.category] || 0) + parseAmount(e.amount);
   });
   
@@ -178,7 +210,7 @@ export default function Reports() {
           onClick={handleExport}
           leftIcon={<Download size={18} />}
         >
-          Download Report
+          Download Snapshot
         </Button>
       </div>
 
@@ -207,7 +239,7 @@ export default function Reports() {
           amount={summary.closing} 
           icon={IndianRupee} 
           color="indigo" 
-           // Added highlight for net balance
+          
         />
       </div>
 
@@ -230,7 +262,6 @@ export default function Reports() {
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                {/* 🚨 FIX: tickFormatter safe parsing */}
                 <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${Number(val)/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
@@ -329,7 +360,6 @@ function StatCard({ label, amount, icon: Icon, color, highlight }) {
           <p className={clsx("text-xs font-bold uppercase tracking-wider", highlight ? "text-slate-400" : "text-slate-500")}>
             {label}
           </p>
-          {/* 🚨 FIX: toLocaleString needs a Number */}
           <h3 className="text-2xl font-bold font-mono mt-1">₹{Number(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</h3>
         </div>
         <div className={clsx("p-3 rounded-xl flex items-center justify-center", !highlight && colors[color], highlight && "bg-slate-800 text-indigo-400")}>

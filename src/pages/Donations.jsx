@@ -1,21 +1,22 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchDonations, deleteDonation } from "../api/donations"; // 👈 New API
+import { fetchDonations, deleteDonation } from "../api/donations"; 
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../context/ToastContext"; // 👈 Toast
+import { useToast } from "../context/ToastContext"; 
+import api from "../api/axios"; 
+import { exportDonationsPDF } from "../utils/pdfExport"; 
 
 // Icons
 import { 
   Plus, Search, Trash2, Heart, Receipt, Calendar, 
-  Loader2, AlertCircle, Lock, Download, Filter 
+  Loader2, Lock, Download, Filter, PlusCircle 
 } from "lucide-react";
 
 // Components
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import ConfirmModal from "../components/ui/ConfirmModal"; // 👈 Confirm Modal
+import ConfirmModal from "../components/ui/ConfirmModal"; 
 import AddDonationModal from "../components/AddDonationModal"; 
-import api from "../api/axios"; // Keep for cycle check only
-import { exportDonationsPDF } from "../utils/pdfExport"; 
+import CreateYearModal from "../components/CreateYearModal"; // 👈 Import Create Year Modal
 
 export default function Donations() {
   const { activeClub } = useAuth();
@@ -24,6 +25,7 @@ export default function Donations() {
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreateYear, setShowCreateYear] = useState(false); // 👈 State for Create Year Modal
   const [searchTerm, setSearchTerm] = useState("");
   const [cycle, setCycle] = useState(null);
 
@@ -32,17 +34,29 @@ export default function Donations() {
 
   const loadDonations = async () => {
     try {
-      const yearRes = await api.get("/years/active");
-      const activeYear = yearRes.data.data;
+      setLoading(true);
       
+      // 1. CHECK ACTIVE YEAR FIRST
+      let activeYear = null;
+      try {
+          const yearRes = await api.get("/years/active");
+          activeYear = yearRes.data.data;
+      } catch (e) {
+          activeYear = null;
+      }
+      
+      setCycle(activeYear);
+
+      // 🛑 STOP IF YEAR IS CLOSED
       if (!activeYear) {
         setLoading(false);
         return;
       }
 
-      setCycle(activeYear);
+      // 2. FETCH DONATIONS (Only if year is open)
       const res = await fetchDonations();
       setDonations(res.data.data);
+
     } catch (err) {
       console.error(err);
       toast.error("Failed to load donations");
@@ -52,7 +66,7 @@ export default function Donations() {
   };
 
   useEffect(() => {
-    loadDonations();
+    if (activeClub) loadDonations();
   }, [activeClub]);
 
   const totalAmount = donations.reduce((sum, d) => sum + Number(d.amount), 0);
@@ -79,8 +93,47 @@ export default function Donations() {
   };
 
   if (loading) return <div className="flex justify-center py-20 text-amber-500"><Loader2 className="animate-spin" /></div>;
-  if (!cycle) return <NoCycleState isAdmin={activeClub?.role === "admin"} />;
 
+  // 🔒 CLOSED YEAR STATE
+  if (!cycle) {
+      if (activeClub?.role === 'admin') {
+          return (
+              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 animate-in fade-in">
+                  <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+                      <PlusCircle size={32} className="text-amber-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800">No Active Collection</h2>
+                  <p className="text-slate-500 max-w-md mt-3 mb-8 leading-relaxed">
+                      Start a new financial year to begin accepting public donations.
+                  </p>
+                  <Button onClick={() => setShowCreateYear(true)} className="bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-200 border-none">
+                      <PlusCircle size={18} className="mr-2" /> Start New Year
+                  </Button>
+                  
+                  {/* Reuse the Create Year Modal */}
+                  {showCreateYear && (
+                    <CreateYearModal 
+                        onSuccess={() => { setShowCreateYear(false); loadDonations(); }} 
+                        onClose={() => setShowCreateYear(false)} 
+                    />
+                  )}
+              </div>
+          );
+      }
+      return (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-slate-200 animate-in fade-in">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+                  <Lock size={32} className="text-slate-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-700">Donations Closed</h2>
+              <p className="text-slate-500 max-w-md mt-2">
+                  Public donations are currently closed until the next session begins.
+              </p>
+          </div>
+      );
+  }
+
+  // 🔓 OPEN YEAR STATE
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
       
@@ -243,20 +296,4 @@ export default function Donations() {
       />
     </div>
   );
-}
-
-function NoCycleState({ isAdmin }) {
-    return (
-        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
-            <div className="bg-slate-100 p-6 rounded-3xl mb-6 shadow-inner">
-                {isAdmin ? <AlertCircle className="w-12 h-12 text-slate-400" /> : <Lock className="w-12 h-12 text-slate-400" />}
-            </div>
-            <h2 className="text-2xl font-bold text-slate-800">No Active Year</h2>
-            <p className="text-slate-500 max-w-md mt-2 leading-relaxed">
-                {isAdmin 
-                    ? "Start a new festival year to accept donations." 
-                    : "Donations are closed until the next session begins."}
-            </p>
-        </div>
-    );
 }

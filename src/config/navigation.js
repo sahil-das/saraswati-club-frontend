@@ -52,7 +52,7 @@ const NAV_ITEMS = [
     label: "Audit Logs",
     path: "/audit-logs",
     icon: History,
-    roles: ["admin","member"]
+    roles: ["admin"]
   },
   { 
     label: "Archives", 

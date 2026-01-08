@@ -83,24 +83,55 @@ export default function Contributions() {
   const toggleExpand = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const handlePayment = async (memberId, subscriptionId, installmentNumber) => {
-    if (activeClub?.role !== "admin") return;
-    if (processing) return;
-
-    setProcessing(`${memberId}-${installmentNumber}`);
-
-    try {
-      const res = await api.post("/subscriptions/pay", { subscriptionId, installmentNumber });
+      // 1. Guard Clauses
+      if (activeClub?.role !== "admin") return;
       
-      setMembers((prev) => prev.map((m) => 
-        m.membershipId === memberId ? { ...m, subscription: res.data.data, error: false } : m
-      ));
-      
-      fetchCentralFund();
-    } catch (err) {
-      alert("Payment failed: " + (err.response?.data?.message || err.message));
-    } finally {
-      setProcessing(null);
-    }
+      // Fix: Only block if THIS specific item is already processing
+      const processKey = `${memberId}-${installmentNumber}`;
+      if (processing === processKey) return; 
+
+      setProcessing(processKey);
+
+      try {
+        const res = await api.post("/subscriptions/pay", { 
+          subscriptionId, 
+          installmentNumber, 
+          memberId 
+        });
+        
+        // 2. State Update
+        setMembers((prev) => prev.map((m) => 
+          m.membershipId === memberId 
+            ? { 
+                ...m, 
+                subscription: res.data.data, 
+                error: null // Clear specific error messages if you have a field for them
+              } 
+            : m
+        ));
+        
+        // 3. Refresh Global Stats
+        // await is optional here depending on if you want the UI to wait for this
+        fetchCentralFund(); 
+
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || err.message;
+        
+        // Option A: Alert (Simple)
+        alert(`Payment failed: ${errorMessage}`);
+
+        // Option B: Set error state on the specific member (Better UX)
+        /*
+        setMembers((prev) => prev.map((m) => 
+          m.membershipId === memberId ? { ...m, error: errorMessage } : m
+        ));
+        */
+
+      } finally {
+        // 4. Cleanup
+        // Only clear if it matches the current process (prevents race conditions)
+        setProcessing((prev) => (prev === processKey ? null : prev));
+      }
   };
 
   const retrySubscription = async (m) => {
@@ -126,11 +157,15 @@ export default function Contributions() {
       }));
 
     exportWeeklyAllMembersPDF({
-        clubName: activeClub?.clubName || "Club Report",
-        members: exportData,
-        totalWeeks: cycle.totalInstallments,
-        weekAmount: cycle.amountPerInstallment
-    });
+            clubName: activeClub?.clubName || "Club Report",
+            members: exportData,
+            cycle: {
+                name: cycle.name,
+                totalWeeks: cycle.totalInstallments,
+                weeklyAmount: cycle.amountPerInstallment
+            },
+            frequency: cycle.subscriptionFrequency // 'weekly' or 'monthly'
+        });
   };
 
   const visibleMembers = activeClub?.role === "admin" 

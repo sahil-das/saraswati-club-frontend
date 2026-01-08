@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import api from "../api/axios";
-import { addFestivalFee } from "../api/festival"; // 👈 API
-import { useToast } from "../context/ToastContext"; // 👈 Toast
+import { addFestivalFee } from "../api/festival";
+import { useToast } from "../context/ToastContext";
 import { X, IndianRupee, User, FileText, Loader2, ChevronDown } from "lucide-react";
 
 // Design System
@@ -10,7 +10,9 @@ import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
 export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) {
+  // ✅ FIX 1: Only require selection if NO member is pre-selected
   const { register, handleSubmit, setValue } = useForm();
+  
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
   const toast = useToast();
@@ -20,6 +22,8 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
         try {
             const res = await api.get("/members");
             setMembers(res.data.data);
+            
+            // Set the value if passed
             if (preSelectedMemberId) {
                 setValue("userId", preSelectedMemberId);
             }
@@ -33,10 +37,30 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await addFestivalFee({ ...data, amount: Number(data.amount) });
+      // ✅ FIX 2: robust ID selection
+      const finalUserId = preSelectedMemberId || data.userId;
+      
+      if (!finalUserId) {
+          toast.error("Please select a member");
+          setLoading(false);
+          return;
+      }
+
+      const payload = {
+        ...data,
+        userId: finalUserId,
+        amount: Number(data.amount)
+      };
+
+      await addFestivalFee(payload);
       toast.success("Festival fee recorded successfully");
-      if(refresh) refresh();
+      
+      // ✅ FIX 3: Safe refresh and close
+      if(refresh) {
+          try { await refresh(); } catch(e) { console.warn("Refresh failed", e); }
+      }
       onClose();
+
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add fee");
     } finally {
@@ -48,7 +72,7 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         
-        {/* HEADER: Rose Theme */}
+        {/* HEADER */}
         <div className="bg-rose-600 px-6 py-4 flex justify-between items-center text-white">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -67,17 +91,27 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
               <div className="relative">
                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                 <select 
-                    {...register("userId", { required: true })}
-                    disabled={!!preSelectedMemberId}
-                    className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 disabled:bg-slate-50 disabled:text-slate-500"
-                 >
-                    <option value="">Select Member...</option>
-                    {members.map(m => (
-                        <option key={m.userId} value={m.userId}>{m.name}</option>
-                    ))}
-                 </select>
-                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                 
+                 {/* ✅ FIX 4: If pre-selected, show a Read-Only Input instead of a Disabled Select */}
+                 {preSelectedMemberId ? (
+                    <div className="w-full bg-slate-50 border border-slate-200 text-slate-500 text-sm rounded-xl pl-10 pr-4 py-3 cursor-not-allowed">
+                        {/* Try to find name, or fallback to 'Selected Member' */}
+                        {members.find(m => m.userId === preSelectedMemberId)?.name || "Current Member"}
+                    </div>
+                 ) : (
+                     <>
+                        <select 
+                            {...register("userId", { required: true })}
+                            className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
+                        >
+                            <option value="">Select Member...</option>
+                            {members.map(m => (
+                                <option key={m.userId} value={m.userId}>{m.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                     </>
+                 )}
               </div>
            </div>
 

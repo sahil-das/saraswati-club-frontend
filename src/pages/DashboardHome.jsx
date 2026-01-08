@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardHome() {
-  const { activeClub, user } = useAuth(); // 👈 Added 'user'
+  const { activeClub, user } = useAuth(); 
   const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,6 @@ export default function DashboardHome() {
   const [showMember, setShowMember] = useState(false);
   const [showPuja, setShowPuja] = useState(false); 
 
-  // 👋 Greeting Logic
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 5) return "Late night working";
@@ -39,33 +38,46 @@ export default function DashboardHome() {
     return "Good Evening";
   }, []);
 
-// Add this state at the top of DashboardHome component
-const [frequency, setFrequency] = useState(null); 
+  const [frequency, setFrequency] = useState(null); 
 
   const fetchSummary = async () => {
     try {
       setLoading(true);
-      // Fetch Summary AND Active Year Config in parallel
-      const [summaryRes, yearRes] = await Promise.all([
-        api.get("/finance/summary"),
-        api.get("/years/active")
-      ]);
       
-      setData(summaryRes.data.data);
+      // 1. Fetch Summary (Critical)
+      const summaryRes = await api.get("/finance/summary");
+      const summaryData = summaryRes.data.data;
+      setData(summaryData);
       
-      // Set frequency (weekly/monthly/none)
-      if (yearRes.data.data) {
-        setFrequency(yearRes.data.data.subscriptionFrequency);
+      // 2. Fetch Active Year Config (Optional - might 404 if no year)
+      try {
+        const yearRes = await api.get("/years/active");
+        if (yearRes.data.data) {
+          setFrequency(yearRes.data.data.subscriptionFrequency);
+        }
+      } catch (e) {
+        // Ignore 404 on active year, it just means we are in "Create Year" mode
+        console.warn("No active year config found, defaulting frequency.");
       }
+
+      // 3. Auto-Trigger Modal if needed
+      if (summaryData?.yearName === "No Active Year" && activeClub?.role === 'admin') {
+         setShowCreateYear(true);
+      }
+
     } catch (err) {
-      console.error(err);
+      console.error("Dashboard Error:", err);
+      // Optional: Set data to null to force a safe state
+      setData(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSummary();
+    if (activeClub) {
+      fetchSummary();
+    }
   }, [activeClub]);
 
   // Loading View
@@ -78,7 +90,8 @@ const [frequency, setFrequency] = useState(null);
     );
   }
 
-  // 1. STATE: NO ACTIVE YEAR
+  // 1. STATE: NO ACTIVE YEAR (Or Data Fetch Failed)
+  // We strictly show this screen if the API says "No Active Year"
   if (data?.yearName === "No Active Year") {
     if (activeClub?.role === 'admin') {
       return (
@@ -104,11 +117,22 @@ const [frequency, setFrequency] = useState(null);
         </div>
       );
     }
+    // Member View when no year is active
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
          <div className="bg-gray-100 p-6 rounded-full mb-4"><Lock className="w-12 h-12 text-gray-400" /></div>
          <h2 className="text-2xl font-bold text-gray-700">Financial Year Closed</h2>
          <p className="text-gray-500 max-w-md mt-2">Please wait for the admin to start the new session.</p>
+      </div>
+    );
+  }
+
+  // 🛡️ Fail-safe: If data is null (API error), don't show broken dashboard
+  if (!data) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 text-slate-400">
+        <p>Unable to load dashboard data. Please try again.</p>
+        <button onClick={fetchSummary} className="mt-4 text-indigo-600 font-bold underline">Retry</button>
       </div>
     );
   }
@@ -219,7 +243,6 @@ const [frequency, setFrequency] = useState(null);
              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 
                 {/* 1. Dynamic Subscription Card */}
-                {/* Only show if frequency is NOT 'none' */}
                 {frequency && frequency !== 'none' && (
                   <BreakdownCard 
                     label={frequency === 'weekly' ? 'Weekly Chanda' : 'Monthly Chanda'} 

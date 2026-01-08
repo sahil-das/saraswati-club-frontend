@@ -27,28 +27,43 @@ export default function CreateYearModal({ onSuccess, onClose }) {
     }
   }, [frequency, setValue]);
 
-  const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      const balanceToSend = data.openingBalance === "" ? "" : Number(data.openingBalance);
+const onSubmit = async (data) => {
+  setLoading(true);
+  try {
+    // ✅ FIX 1: If empty string, send undefined. 
+    // This allows the Backend Controller to trigger "Auto-Transfer" logic.
+    // Joi will accept 'undefined' because the field is .optional()
+    const balanceToSend = data.openingBalance === "" ? undefined : Number(data.openingBalance);
 
-      await api.post("/years", {
-        name: data.name,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        openingBalance: balanceToSend,
-        subscriptionFrequency: data.frequency,
-        totalInstallments: data.frequency === 'monthly' ? 12 : Number(data.totalInstallments),
-        amountPerInstallment: Number(data.amountPerInstallment)
-      });
-      
-      if (onSuccess) onSuccess();
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to create year");
-    } finally {
-      setLoading(false);
+    // ✅ FIX 2: Handle 'none' frequency
+    // If 'none', don't send 0, send undefined to bypass Joi's .min(1) rule.
+    let installmentsToSend;
+    if (data.frequency === 'none') {
+        installmentsToSend = undefined;
+    } else if (data.frequency === 'monthly') {
+        installmentsToSend = 12;
+    } else {
+        installmentsToSend = Number(data.totalInstallments);
     }
-  };
+
+    await api.post("/years", {
+      name: data.name,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      openingBalance: balanceToSend, // 👈 Sends number or undefined (not "")
+      subscriptionFrequency: data.frequency,
+      totalInstallments: installmentsToSend, // 👈 Sends valid number or undefined (not 0)
+      amountPerInstallment: Number(data.amountPerInstallment)
+    });
+    
+    if (onSuccess) onSuccess();
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.message || "Failed to create year");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     // 1. BACKDROP ANIMATION (Fade In)

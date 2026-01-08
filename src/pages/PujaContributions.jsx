@@ -1,21 +1,23 @@
 import { useEffect, useState, useMemo } from "react";
-import api from "../api/axios"; // Keep for fetching members/years
-import { fetchFestivalFees, addFestivalFee, deleteFestivalFee } from "../api/festival"; // 👈 New API
+import api from "../api/axios"; 
+import { fetchFestivalFees, addFestivalFee, deleteFestivalFee } from "../api/festival"; 
 import { useFinance } from "../context/FinanceContext";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../context/ToastContext"; // 👈 Toast
+import { useToast } from "../context/ToastContext"; 
 
 // Icons
 import { 
   Loader2, IndianRupee, User, Plus, Trash2, Calendar, 
-  Search, Filter, Download, X, Banknote, ChevronDown, Sparkles 
+  Search, Filter, Download, X, Banknote, ChevronDown, Sparkles,
+  Lock, PlusCircle // 👈 Added Icons
 } from "lucide-react";
 
 // Components
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
-import ConfirmModal from "../components/ui/ConfirmModal"; // 👈 Confirm Modal
+import ConfirmModal from "../components/ui/ConfirmModal"; 
+import CreateYearModal from "../components/CreateYearModal"; // 👈 Import Create Year Modal
 import { exportPujaPDF } from "../utils/pdfExport";
 
 export default function PujaContributions() {
@@ -32,6 +34,7 @@ export default function PujaContributions() {
   
   // Mobile Form & Delete State
   const [showMobileForm, setShowMobileForm] = useState(false);
+  const [showCreateYear, setShowCreateYear] = useState(false); // 👈 Create Year State
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
   // Form State
@@ -39,26 +42,46 @@ export default function PujaContributions() {
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    loadData();
+    if (activeClub) loadData();
   }, [activeClub]);
 
   const loadData = async () => {
       try {
         setLoading(true);
-        const [mRes, pRes, yearRes] = await Promise.all([
+        
+        // 1. CHECK YEAR FIRST
+        // We need to know if a year exists before fetching fees
+        let currentYear = null;
+        try {
+            const yearRes = await api.get("/years/active");
+            currentYear = yearRes.data.data;
+        } catch (e) {
+            // 404 means no active year
+            currentYear = null;
+        }
+
+        setActiveYear(currentYear);
+
+        // 🛑 STOP IF YEAR IS CLOSED
+        if (!currentYear) {
+            setLoading(false);
+            return; 
+        }
+
+        // 2. FETCH DATA (Only if Year is Open)
+        const [mRes, pRes] = await Promise.all([
           api.get("/members"),
-          fetchFestivalFees(), // 👈 Use API
-          api.get("/years/active"),
+          fetchFestivalFees(),
+          fetchCentralFund() // Sync context
         ]);
         
         setMembers((mRes.data.data || []).sort((a, b) => a.name.localeCompare(b.name)));
         setRows(pRes.data.data || []);
-        setActiveYear(yearRes.data.data);
         
-        await fetchCentralFund(); 
       } catch (err) {
         console.error("Data load error", err);
-        toast.error("Failed to load festival data");
+        // Only show error if we expected data (Year was open)
+        if (activeYear) toast.error("Failed to load festival data");
       } finally {
         setLoading(false);
       }
@@ -114,7 +137,6 @@ export default function PujaContributions() {
 
   /* ================= COMPONENTS ================= */
   
-  // The Contribution Form (Reusable)
   const ContributionForm = () => (
     <form onSubmit={handleAddContribution} className="space-y-4">
         <div>
@@ -165,8 +187,50 @@ export default function PujaContributions() {
     </form>
   );
 
+  /* ================= RENDER ================= */
+
   if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-rose-600"><Loader2 className="animate-spin w-10 h-10"/></div>;
 
+  // 🔒 CLOSED YEAR STATE
+  if (!activeYear) {
+      if (activeClub?.role === 'admin') {
+          return (
+              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 animate-in fade-in">
+                  <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+                      <PlusCircle size={32} className="text-rose-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800">No Active Festival</h2>
+                  <p className="text-slate-500 max-w-md mt-3 mb-8 leading-relaxed">
+                      You need to start a new financial year before collecting Puja contributions.
+                  </p>
+                  <Button onClick={() => setShowCreateYear(true)} className="shadow-lg shadow-rose-200">
+                      <PlusCircle size={18} className="mr-2" /> Start New Year
+                  </Button>
+                  
+                  {/* Reuse the Create Year Modal */}
+                  {showCreateYear && (
+                    <CreateYearModal 
+                        onSuccess={() => { setShowCreateYear(false); loadData(); }} 
+                        onClose={() => setShowCreateYear(false)} 
+                    />
+                  )}
+              </div>
+          );
+      }
+      return (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-slate-200 animate-in fade-in">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+                  <Lock size={32} className="text-slate-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-700">Financial Year Closed</h2>
+              <p className="text-slate-500 max-w-md mt-2">
+                  Please wait for the admin to start the new festival cycle.
+              </p>
+          </div>
+      );
+  }
+
+  // 🔓 OPEN YEAR STATE
   return (
     <div className="space-y-6 pb-24 md:pb-10 animate-fade-in relative">
       

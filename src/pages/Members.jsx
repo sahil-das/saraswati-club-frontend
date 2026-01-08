@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom"; // 👈 Import Link
+import { Link } from "react-router-dom"; 
 import { fetchMembers, deleteMember, updateMemberRole } from "../api/members";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { 
   Search, UserPlus, Phone, MessageCircle, ShieldCheck, 
-  Trash2, Mail, Loader2, User, ChevronRight 
+  Trash2, Mail, Loader2, User, ChevronRight, Download // 👈 Download Icon
 } from "lucide-react";
 
 import { Button } from "../components/ui/Button";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import AddMemberModal from "../components/AddMemberModal";
+// ✅ CORRECT IMPORT: Use the existing function from pdfExport.js
+import { exportMembersPDF } from "../utils/pdfExport"; 
 
 export default function Members() {
   const { activeClub } = useAuth();
@@ -22,7 +24,6 @@ export default function Members() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState({ isOpen: false, type: null, id: null });
 
-  // ... (Keep loadMembers, handleCall, handleWhatsApp, delete/role logic same as before) ...
   const loadMembers = async () => {
     try {
       setLoading(true);
@@ -39,22 +40,21 @@ export default function Members() {
   useEffect(() => { loadMembers(); }, [activeClub]);
 
   const initiateDelete = (id) => setConfirmAction({ isOpen: true, type: "delete", id, title: "Remove Member?", message: "This cannot be undone.", isDangerous: true });
-  const initiateRoleToggle = (m) => setConfirmAction({ isOpen: true, type: "role", id: m.membershipId, data: m.role === "admin" ? "member" : "admin", title: "Change Role?", message: "Modify admin privileges.", isDangerous: m.role === "member" }); // Demote is dangerous
+  const initiateRoleToggle = (m) => setConfirmAction({ isOpen: true, type: "role", id: m.membershipId, data: m.role === "admin" ? "member" : "admin", title: "Change Role?", message: "Modify admin privileges.", isDangerous: m.role === "member" }); 
 
   const executeAction = async () => {
-     // ... (Keep existing logic) ...
-     try {
-       if (confirmAction.type === 'delete') {
-         await deleteMember(confirmAction.id);
-         setMembers(prev => prev.filter(m => m.membershipId !== confirmAction.id));
-         toast.success("Member removed");
-       } else if (confirmAction.type === 'role') {
-         await updateMemberRole(confirmAction.id, confirmAction.data);
-         setMembers(prev => prev.map(m => m.membershipId === confirmAction.id ? { ...m, role: confirmAction.data } : m));
-         toast.success("Role updated");
-       }
-     } catch(e) { toast.error("Action failed"); }
-     setConfirmAction({ ...confirmAction, isOpen: false });
+      try {
+        if (confirmAction.type === 'delete') {
+          await deleteMember(confirmAction.id);
+          setMembers(prev => prev.filter(m => m.membershipId !== confirmAction.id));
+          toast.success("Member removed");
+        } else if (confirmAction.type === 'role') {
+          await updateMemberRole(confirmAction.id, confirmAction.data);
+          setMembers(prev => prev.map(m => m.membershipId === confirmAction.id ? { ...m, role: confirmAction.data } : m));
+          toast.success("Role updated");
+        }
+      } catch(e) { toast.error("Action failed"); }
+      setConfirmAction({ ...confirmAction, isOpen: false });
   };
 
   const filteredMembers = useMemo(() => {
@@ -75,9 +75,23 @@ export default function Members() {
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Members</h1>
           <p className="text-slate-500 text-sm font-medium">{members.length} Active Members</p>
         </div>
-        {activeClub?.role === 'admin' && (
-          <Button onClick={() => setShowAddModal(true)} leftIcon={<UserPlus size={18} />}>Add Member</Button>
-        )}
+        
+        <div className="flex gap-2 w-full md:w-auto">
+             {/* ✅ EXPORT BUTTON */}
+             <Button 
+                variant="secondary"
+                onClick={() => exportMembersPDF({
+                    clubName: activeClub?.clubName,
+                    members: filteredMembers
+                })}
+             >
+                <Download size={18} /> <span className="hidden sm:inline ml-2">Export List</span>
+             </Button>
+
+             {activeClub?.role === 'admin' && (
+                <Button onClick={() => setShowAddModal(true)} leftIcon={<UserPlus size={18} />}>Add Member</Button>
+             )}
+        </div>
       </div>
 
       {/* SEARCH */}
@@ -99,7 +113,6 @@ export default function Members() {
             
             {/* 1. TOP ROW: CLICKABLE PROFILE LINK */}
             <div className="flex justify-between items-start">
-               {/* WRAP THIS PART IN LINK 👇 */}
                <Link 
                  to={`/members/${member.membershipId}`} 
                  className="flex items-center gap-3 flex-1 group-hover:opacity-80 transition-opacity"
