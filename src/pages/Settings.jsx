@@ -117,7 +117,15 @@ export default function Settings() {
     setLoading(true);
     try {
       if (noActiveCycle) {
-        await createYear(formData);
+        // 🚨 FIX: Prepare payload to handle "none" frequency validation
+        const payload = { ...formData };
+        
+        // If frequency is 'none', send undefined for installments to bypass Joi .min(1)
+        if (payload.subscriptionFrequency === 'none') {
+            payload.totalInstallments = undefined;
+        }
+
+        await createYear(payload);
         toast.success("New Festival Year Started Successfully!");
         setTimeout(() => window.location.reload(), 1500);
       } else {

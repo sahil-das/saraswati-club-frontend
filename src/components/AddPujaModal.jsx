@@ -10,7 +10,6 @@ import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
 export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) {
-  // ✅ FIX 1: Only require selection if NO member is pre-selected
   const { register, handleSubmit, setValue } = useForm();
   
   const [loading, setLoading] = useState(false);
@@ -18,26 +17,27 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
   const toast = useToast();
 
   useEffect(() => {
-    const loadMembers = async () => {
-        try {
-            const res = await api.get("/members");
-            setMembers(res.data.data);
-            
-            // Set the value if passed
-            if (preSelectedMemberId) {
-                setValue("userId", preSelectedMemberId);
+    // Only fetch members list if we need to show the dropdown
+    if (!preSelectedMemberId) {
+        const loadMembers = async () => {
+            try {
+                const res = await api.get("/members");
+                setMembers(res.data.data);
+            } catch(err) {
+                console.error(err);
             }
-        } catch(err) {
-            console.error(err);
         }
+        loadMembers();
+    } else {
+        // If pre-selected, just set the value for the form logic (optional, as we handle it in onSubmit)
+        setValue("userId", preSelectedMemberId);
     }
-    loadMembers();
   }, [preSelectedMemberId, setValue]);
 
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      // ✅ FIX 2: robust ID selection
+      // ✅ Logic: Use the Prop ID if available, otherwise use Form ID
       const finalUserId = preSelectedMemberId || data.userId;
       
       if (!finalUserId) {
@@ -55,7 +55,6 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
       await addFestivalFee(payload);
       toast.success("Festival fee recorded successfully");
       
-      // ✅ FIX 3: Safe refresh and close
       if(refresh) {
           try { await refresh(); } catch(e) { console.warn("Refresh failed", e); }
       }
@@ -87,33 +86,25 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
            
-           <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
-              <div className="relative">
-                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                 
-                 {/* ✅ FIX 4: If pre-selected, show a Read-Only Input instead of a Disabled Select */}
-                 {preSelectedMemberId ? (
-                    <div className="w-full bg-slate-50 border border-slate-200 text-slate-500 text-sm rounded-xl pl-10 pr-4 py-3 cursor-not-allowed">
-                        {/* Try to find name, or fallback to 'Selected Member' */}
-                        {members.find(m => m.userId === preSelectedMemberId)?.name || "Current Member"}
-                    </div>
-                 ) : (
-                     <>
-                        <select 
-                            {...register("userId", { required: true })}
-                            className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
-                        >
-                            <option value="">Select Member...</option>
-                            {members.map(m => (
-                                <option key={m.userId} value={m.userId}>{m.name}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                     </>
-                 )}
-              </div>
-           </div>
+           {/* ✅ FIX: HIDE Member Selection if ID is pre-selected */}
+           {!preSelectedMemberId && (
+               <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
+                  <div className="relative">
+                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                     <select 
+                         {...register("userId", { required: true })}
+                         className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
+                     >
+                         <option value="">Select Member...</option>
+                         {members.map(m => (
+                             <option key={m.userId} value={m.userId}>{m.name}</option>
+                         ))}
+                     </select>
+                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                  </div>
+               </div>
+           )}
 
            <Input 
               label="Amount (₹)"

@@ -28,7 +28,7 @@ const parseAmount = (val) => {
 };
 
 export default function CollectionsOverview() {
-  const { weeklyTotal, pujaTotal, donationTotal, loading: financeLoading } = useFinance();
+  const { weeklyTotal, pujaTotal, donationTotal, openingBalance, loading: financeLoading } = useFinance();
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,11 +52,12 @@ export default function CollectionsOverview() {
   }, []);
 
   // 🚨 FIX: Parse all inputs before summing
+  const parsedOpening = parseAmount(openingBalance);
   const parsedWeekly = parseAmount(weeklyTotal);
   const parsedPuja = parseAmount(pujaTotal);
   const parsedDonation = parseAmount(donationTotal);
   
-  const totalCollection = parsedWeekly + parsedPuja + parsedDonation;
+  const totalCollection = parsedOpening + parsedWeekly + parsedPuja + parsedDonation;
 
   /* ===== GROUP & FILTER ===== */
   const filteredDonations = useMemo(() => {
@@ -107,7 +108,14 @@ export default function CollectionsOverview() {
       </div>
 
       {/* 2. STATS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <SummaryCard 
+          label="Opening Balance" 
+          value={parsedOpening}
+          loading={financeLoading}
+          color="green"
+          icon={Calendar}
+        />
         <SummaryCard 
           label="Weekly collection" 
           value={parsedWeekly} // 🚨 FIX: Pass parsed value
@@ -245,6 +253,7 @@ export default function CollectionsOverview() {
                 <p className="text-slate-400 text-sm mb-6">How current funds are allocated across categories.</p>
                 
                 <div className="space-y-4">
+                    <DistributionBar label="Opening Balance" amount={parsedOpening} total={totalCollection} color="bg-green-500" />
                     <DistributionBar label="Subscriptions" amount={parsedWeekly} total={totalCollection} color="bg-blue-500" />
                     <DistributionBar label="Festival" amount={parsedPuja} total={totalCollection} color="bg-pink-500" />
                     <DistributionBar label="Donations" amount={parsedDonation} total={totalCollection} color="bg-amber-500" />
@@ -264,6 +273,7 @@ function SummaryCard({ label, value, loading, highlight, color, icon: Icon }) {
         blue: "bg-blue-50 text-blue-700 border-blue-100",
         pink: "bg-pink-50 text-pink-700 border-pink-100",
         amber: "bg-amber-50 text-amber-700 border-amber-100",
+        green: "bg-green-50 text-green-700 border-green-100",
     };
 
     return (

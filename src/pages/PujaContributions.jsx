@@ -9,7 +9,7 @@ import { useToast } from "../context/ToastContext";
 import { 
   Loader2, IndianRupee, User, Plus, Trash2, Calendar, 
   Search, Filter, Download, X, Banknote, ChevronDown, Sparkles,
-  Lock, PlusCircle // 👈 Added Icons
+  Lock, PlusCircle 
 } from "lucide-react";
 
 // Components
@@ -17,128 +17,12 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import ConfirmModal from "../components/ui/ConfirmModal"; 
-import CreateYearModal from "../components/CreateYearModal"; // 👈 Import Create Year Modal
+import CreateYearModal from "../components/CreateYearModal"; 
 import { exportPujaPDF } from "../utils/pdfExport";
 
-export default function PujaContributions() {
-  const { fetchCentralFund, pujaTotal } = useFinance();
-  const { activeClub } = useAuth(); 
-  const toast = useToast();
-
-  const [members, setMembers] = useState([]);
-  const [rows, setRows] = useState([]);
-  const [activeYear, setActiveYear] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  
-  // Mobile Form & Delete State
-  const [showMobileForm, setShowMobileForm] = useState(false);
-  const [showCreateYear, setShowCreateYear] = useState(false); // 👈 Create Year State
-  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
-
-  // Form State
-  const [form, setForm] = useState({ userId: "", amount: "", notes: "" });
-
-  /* ================= LOAD DATA ================= */
-  useEffect(() => {
-    if (activeClub) loadData();
-  }, [activeClub]);
-
-  const loadData = async () => {
-      try {
-        setLoading(true);
-        
-        // 1. CHECK YEAR FIRST
-        // We need to know if a year exists before fetching fees
-        let currentYear = null;
-        try {
-            const yearRes = await api.get("/years/active");
-            currentYear = yearRes.data.data;
-        } catch (e) {
-            // 404 means no active year
-            currentYear = null;
-        }
-
-        setActiveYear(currentYear);
-
-        // 🛑 STOP IF YEAR IS CLOSED
-        if (!currentYear) {
-            setLoading(false);
-            return; 
-        }
-
-        // 2. FETCH DATA (Only if Year is Open)
-        const [mRes, pRes] = await Promise.all([
-          api.get("/members"),
-          fetchFestivalFees(),
-          fetchCentralFund() // Sync context
-        ]);
-        
-        setMembers((mRes.data.data || []).sort((a, b) => a.name.localeCompare(b.name)));
-        setRows(pRes.data.data || []);
-        
-      } catch (err) {
-        console.error("Data load error", err);
-        // Only show error if we expected data (Year was open)
-        if (activeYear) toast.error("Failed to load festival data");
-      } finally {
-        setLoading(false);
-      }
-  };
-
-  /* ================= HANDLERS ================= */
-  const handleAddContribution = async (e) => {
-    e.preventDefault();
-    if (!form.userId || !form.amount) return;
-
-    setSubmitting(true);
-    try {
-      await addFestivalFee({
-        userId: form.userId, 
-        amount: Number(form.amount),
-        notes: form.notes
-      });
-      
-      toast.success("Festival fee recorded!");
-      setForm({ userId: "", amount: "", notes: "" });
-      setShowMobileForm(false); 
-      
-      // Refresh Data
-      const res = await fetchFestivalFees();
-      setRows(res.data.data || []);
-      await fetchCentralFund();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to add record");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      await deleteFestivalFee(confirmDelete.id);
-      setRows(rows.filter(r => r._id !== confirmDelete.id));
-      await fetchCentralFund();
-      toast.success("Record deleted");
-    } catch (err) {
-      toast.error("Failed to delete record");
-    } finally {
-      setConfirmDelete({ isOpen: false, id: null });
-    }
-  };
-
-  const filteredRows = useMemo(() => {
-    return rows.filter(r => 
-      (r.user?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (r.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [rows, searchTerm]);
-
-  /* ================= COMPONENTS ================= */
-  
-  const ContributionForm = () => (
-    <form onSubmit={handleAddContribution} className="space-y-4">
+// 👇 MOVED OUTSIDE: Extracted component to prevent re-renders
+const ContributionForm = ({ form, setForm, members, onSubmit, submitting }) => (
+    <form onSubmit={onSubmit} className="space-y-4">
         <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
             <div className="relative">
@@ -185,7 +69,110 @@ export default function PujaContributions() {
             Record Payment
         </Button>
     </form>
-  );
+);
+
+export default function PujaContributions() {
+  const { fetchCentralFund, pujaTotal } = useFinance();
+  const { activeClub } = useAuth(); 
+  const toast = useToast();
+
+  const [members, setMembers] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [activeYear, setActiveYear] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const [showMobileForm, setShowMobileForm] = useState(false);
+  const [showCreateYear, setShowCreateYear] = useState(false); 
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
+
+  const [form, setForm] = useState({ userId: "", amount: "", notes: "" });
+
+  useEffect(() => {
+    if (activeClub) loadData();
+  }, [activeClub]);
+
+  const loadData = async () => {
+      try {
+        setLoading(true);
+        let currentYear = null;
+        try {
+            const yearRes = await api.get("/years/active");
+            currentYear = yearRes.data.data;
+        } catch (e) {
+            currentYear = null;
+        }
+
+        setActiveYear(currentYear);
+
+        if (!currentYear) {
+            setLoading(false);
+            return; 
+        }
+
+        const [mRes, pRes] = await Promise.all([
+          api.get("/members"),
+          fetchFestivalFees(),
+          fetchCentralFund() 
+        ]);
+        
+        setMembers((mRes.data.data || []).sort((a, b) => a.name.localeCompare(b.name)));
+        setRows(pRes.data.data || []);
+        
+      } catch (err) {
+        console.error("Data load error", err);
+        if (activeYear) toast.error("Failed to load festival data");
+      } finally {
+        setLoading(false);
+      }
+  };
+
+  const handleAddContribution = async (e) => {
+    e.preventDefault();
+    if (!form.userId || !form.amount) return;
+
+    setSubmitting(true);
+    try {
+      await addFestivalFee({
+        userId: form.userId, 
+        amount: Number(form.amount),
+        notes: form.notes
+      });
+      
+      toast.success("Festival fee recorded!");
+      setForm({ userId: "", amount: "", notes: "" });
+      setShowMobileForm(false); 
+      
+      const res = await fetchFestivalFees();
+      setRows(res.data.data || []);
+      await fetchCentralFund();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to add record");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteFestivalFee(confirmDelete.id);
+      setRows(rows.filter(r => r._id !== confirmDelete.id));
+      await fetchCentralFund();
+      toast.success("Record deleted");
+    } catch (err) {
+      toast.error("Failed to delete record");
+    } finally {
+      setConfirmDelete({ isOpen: false, id: null });
+    }
+  };
+
+  const filteredRows = useMemo(() => {
+    return rows.filter(r => 
+      (r.user?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [rows, searchTerm]);
 
   /* ================= RENDER ================= */
 
@@ -207,7 +194,6 @@ export default function PujaContributions() {
                       <PlusCircle size={18} className="mr-2" /> Start New Year
                   </Button>
                   
-                  {/* Reuse the Create Year Modal */}
                   {showCreateYear && (
                     <CreateYearModal 
                         onSuccess={() => { setShowCreateYear(false); loadData(); }} 
@@ -250,7 +236,6 @@ export default function PujaContributions() {
            </div>
         </div>
         
-        {/* TOTAL CARD */}
         <div className="w-full md:w-auto bg-gradient-to-br from-rose-500 to-pink-600 text-white p-1 rounded-2xl shadow-xl shadow-rose-200">
            <div className="bg-white/10 px-6 py-4 rounded-xl backdrop-blur-sm flex flex-col items-end min-w-[200px]">
                 <span className="text-[10px] font-bold opacity-90 uppercase tracking-wider mb-1">Total Collected</span>
@@ -271,7 +256,15 @@ export default function PujaContributions() {
                  </div>
                  New Contribution
               </div>
-              <ContributionForm />
+              
+              {/* 👇 UPDATED: Passed Props */}
+              <ContributionForm 
+                  form={form} 
+                  setForm={setForm} 
+                  members={members} 
+                  onSubmit={handleAddContribution} 
+                  submitting={submitting} 
+              />
             </Card>
           </div>
         )}
@@ -395,7 +388,16 @@ export default function PujaContributions() {
                         <X size={20} />
                     </button>
                 </div>
-                <ContributionForm />
+                
+                {/* 👇 UPDATED: Passed Props */}
+                <ContributionForm 
+                    form={form} 
+                    setForm={setForm} 
+                    members={members} 
+                    onSubmit={handleAddContribution} 
+                    submitting={submitting} 
+                />
+
                 <div className="h-4" /> 
             </div>
         </div>
