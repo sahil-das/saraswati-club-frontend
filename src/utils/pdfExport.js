@@ -125,7 +125,7 @@ export const exportHistoryCyclePDF = ({
   const doc = new jsPDF();
   const margin = 14;
   
-  const cycleDate = `${new Date(cycle.startDate).toLocaleDateString()} - ${new Date(cycle.endDate).toLocaleDateString()}`;
+  const cycleDate = `${new Date(cycle.startDate).toLocaleDateString('en-IN')} - ${new Date(cycle.endDate).toLocaleDateString('en-IN')}`;
   let y = drawHeader(doc, clubName, "Financial History Report", `Cycle: ${cycle.name} | ${cycleDate}`);
 
   // --- SUMMARY TABLE ---
@@ -202,12 +202,12 @@ export const exportHistoryCyclePDF = ({
 
   if (donations?.length) {
     const totalDonations = donations.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-    addSection("Donations", ["Donor", "Date", "Amount"], donations.map(d => [d.donorName, new Date(d.date).toLocaleDateString(), formatCurrency(d.amount)]), COLORS.accent, totalDonations);
+    addSection("Donations", ["Donor", "Date", "Amount"], donations.map(d => [d.donorName, new Date(d.date).toLocaleDateString('en-IN'), formatCurrency(d.amount)]), COLORS.accent, totalDonations);
   }
 
   if (expenses?.length) {
     const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    addSection("Expenses Breakdown", ["Title", "Date", "Amount"], expenses.map(e => [e.title, new Date(e.date).toLocaleDateString(), formatCurrency(e.amount)]), COLORS.danger, totalExpenses);
+    addSection("Expenses Breakdown", ["Title", "Date", "Amount"], expenses.map(e => [e.title, new Date(e.date).toLocaleDateString('en-IN'), formatCurrency(e.amount)]), COLORS.danger, totalExpenses);
   }
 
   drawFooter(doc);
@@ -292,7 +292,7 @@ export const exportDonationsPDF = ({ clubName, cycleName, donations = [] }) => {
     startY: y,
     head: [["Date", "Receipt No", "Donor Name", "Contact", "Amount"]],
     body: donations.map((d) => [
-      new Date(d.date).toLocaleDateString(),
+      new Date(d.date).toLocaleDateString('en-IN'),
       d.receiptNo || "-",
       d.donorName || "-",
       d.phone || d.address || "-",
@@ -330,7 +330,7 @@ export const exportExpensesPDF = ({ clubName, cycleName, expenses }) => {
     startY: y,
     head: [["Date", "Title", "Category", "Recorded By", "Status", "Amount"]],
     body: expenses.map((e) => [
-      new Date(e.date).toLocaleDateString(),
+      new Date(e.date).toLocaleDateString('en-IN'),
       e.title,
       e.category,
       e.recordedBy?.name || "-",
@@ -378,7 +378,7 @@ export const exportPujaPDF = ({ clubName, cycleName, data }) => {
     startY: y,
     head: [["Date", "Member Name", "Notes", "Amount"]],
     body: data.map((row) => [
-      new Date(row.createdAt).toLocaleDateString(),
+      new Date(row.createdAt).toLocaleDateString('en-IN'),
       row.user?.name || "Unknown",
       row.notes || "-",
       formatCurrency(row.amount),
@@ -412,7 +412,7 @@ export const exportMembersPDF = ({ clubName, members }) => {
       m.role.toUpperCase(),
       m.phone || "-",
       m.email,
-      new Date(m.joinedAt).toLocaleDateString()
+      new Date(m.joinedAt).toLocaleDateString('en-IN')
     ]),
     theme: "striped",
     headStyles: { fillColor: COLORS.primary },
@@ -450,7 +450,7 @@ export const exportAuditLogsPDF = ({ clubName, logs, period }) => {
         }
 
         return [
-          new Date(log.createdAt).toLocaleDateString(),
+          new Date(log.createdAt).toLocaleDateString('en-IN'),
           new Date(log.createdAt).toLocaleTimeString(),
           log.actor?.name || "System",
           log.action?.replace(/_/g, ' ') || "-",
