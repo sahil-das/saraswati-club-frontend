@@ -1,11 +1,10 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Providers & Components
 import { AuthProvider } from "./context/AuthContext";
 import { FinanceProvider } from "./context/FinanceContext"; 
 import ProtectedRoute from "./components/ProtectedRoute";
-import PublicRoute from "./components/PublicRoute"; // 👈 IMPORT THIS
 import RequireSubscription from "./components/RequireSubscription";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
@@ -36,14 +35,11 @@ export default function App() {
         <ToastProvider>
           <BrowserRouter>
             <Routes>
-              
-              {/* 🟢 PUBLIC ROUTES (Redirects to Dashboard if already logged in) */}
-              <Route element={<PublicRoute />}>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<RegisterClub />} />
-              </Route>
+              {/* PUBLIC ROUTES */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<RegisterClub />} />
 
-              {/* 🔒 PROTECTED ROUTES (Accessible only if logged in) */}
+              {/* PROTECTED ROUTES */}
               <Route 
                 path="/" 
                 element={
@@ -58,31 +54,29 @@ export default function App() {
                 <Route index element={<DashboardHome />} />
                 <Route path="profile" element={<UserProfile />} />
 
-                {/* ✅ AVAILABLE TO EVERYONE */}
+                {/* AVAILABLE TO EVERYONE */}
                 <Route path="puja-contributions" element={<PujaContributions />} />
                 <Route path="collections" element={<CollectionsOverview />} />
                 <Route path="donations" element={<Donations />} />
                 <Route path="expenses" element={<Expenses />} />
                 <Route path="archives" element={<Archives />} />
                 
-                {/* 🚨 Members is open to all (Privacy logic inside) */}
+                {/* Members is open to all */}
                 <Route path="members" element={<Members />} />
 
-                {/* 🔒 SUBSCRIPTIONS (Blocked if 'None') */}
+                {/* SUBSCRIPTIONS */}
                 <Route element={<RequireSubscription />}>
                   <Route path="contributions" element={<Contributions />} />
                 </Route>
 
-                {/* --- 🔒 ADMIN ONLY --- */}
+                {/* ADMIN ONLY */}
                 <Route path="members/:memberId" element={<ProtectedRoute role="admin"><MemberDetails /></ProtectedRoute>} />
                 <Route path="reports" element={<ProtectedRoute role="admin"><Reports /></ProtectedRoute>} />
                 <Route path="settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
                 <Route path="audit-logs" element={<ProtectedRoute role="admin"><AuditLogs /></ProtectedRoute>} />
               </Route>
 
-              {/* 404 Not Found */}
               <Route path="*" element={<NotFound />} />
-
             </Routes>
           </BrowserRouter>
         </ToastProvider>

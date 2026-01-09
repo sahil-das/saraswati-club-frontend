@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; // 👈 Added useEffect
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { User, Lock, ArrowRight, LayoutDashboard, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { User, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 // Components
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { Card } from "../components/ui/Card";
+// 👇 CRITICAL FIX: Keep this lowercase "card" to prevent Linux crashes
+import { Card } from "../components/ui/Card"; 
 
 export default function Login() {
   const [input, setInput] = useState("");
@@ -15,8 +16,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  const { login, selectClub } = useAuth(); 
+  // 👇 Extract 'user' and 'loading' from AuthContext
+  const { login, selectClub, user, loading: authLoading } = useAuth(); 
   const navigate = useNavigate();
+
+  // ✅ NEW: Redirect to Dashboard if already logged in
+  useEffect(() => {
+    // If the user exists and AuthContext has finished loading...
+    if (user && !authLoading) {
+      navigate("/", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,12 +35,10 @@ export default function Login() {
 
     try {
       const result = await login(input, password);
-      // `login` returns an object: { user, clubs }
       const clubs = (result && result.clubs) || [];
       if (clubs && clubs.length === 1) selectClub(clubs[0]);
       navigate("/");
     } catch (err) {
-      // Distinguish error types for better UX
       if (err?.response) {
         const status = err.response.status;
         const data = err.response.data || {};
@@ -41,6 +49,9 @@ export default function Login() {
             setError(serverMessage || "Bad request. Please check your input.");
             break;
           case 401:
+            // This is "Wrong Password". 
+            // Since we are inside the page, this will just show the error 
+            // and NOT trigger the infinite reload loop.
             setError(serverMessage || "Invalid credentials. Please double-check your ID and password.");
             break;
           case 403:
@@ -61,10 +72,8 @@ export default function Login() {
             break;
         }
       } else if (err?.request) {
-        // request made but no response
         setError("No response from server. Check your network connection.");
       } else {
-        // something happened setting up the request
         setError(err.message || "An unknown error occurred.");
       }
     } finally {
@@ -72,33 +81,25 @@ export default function Login() {
     }
   };
 
+  // Optional: Prevent the form from flashing briefly while checking auth status
+  if (authLoading) return null; 
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-slate-50">
-      
-      {/* BACKGROUND BLOBS */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-200/30 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/30 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="w-full max-w-md px-4 relative z-10 animate-fade-in">
-        
-        {/* BRANDING */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-lg shadow-slate-200/50 mb-6 ring-1 ring-slate-100">
-              {/* 👇 REPLACED THE 'CK' BOX WITH IMAGE TAG 👇 */}
-              <img 
-                src="/logo.png"  // 👈 Make sure 'logo.png' is in your public folder
-                alt="ClubKhata Logo" 
-                className="w-12 h-12 object-contain" 
-              />
+              <img src="/logo.png" alt="ClubKhata Logo" className="w-12 h-12 object-contain" />
           </div>
-          
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
           <p className="text-slate-500 mt-2 text-sm">Enter your System ID to access ClubKhata.</p>
         </div>
-        {/* LOGIN CARD */}
+        
         <Card className="shadow-2xl shadow-slate-200/60 border-slate-100 p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            
             {error && (
               <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3 animate-slide-up">
                 <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={18} />
@@ -127,29 +128,17 @@ export default function Login() {
                 required
                 className="bg-slate-50 border-slate-200 focus:bg-white transition-colors"
                 suffix={
-                  <button 
-                    type="button" 
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="hover:text-slate-600 text-slate-400 transition-colors focus:outline-none"
-                    tabIndex={-1}
-                  >
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="hover:text-slate-600 text-slate-400 transition-colors focus:outline-none" tabIndex={-1}>
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 }
               />
               <div className="flex justify-end">
-                <button type="button" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline">
-                  Forgot password?
-                </button>
+                <button type="button" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline">Forgot password?</button>
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full py-3 text-base shadow-lg shadow-indigo-200 hover:shadow-indigo-300" 
-              isLoading={loading}
-              rightIcon={<ArrowRight size={18} />}
-            >
+            <Button type="submit" className="w-full py-3 text-base shadow-lg shadow-indigo-200 hover:shadow-indigo-300" isLoading={loading} rightIcon={<ArrowRight size={18} />}>
               Sign In
             </Button>
           </form>
@@ -157,9 +146,7 @@ export default function Login() {
 
         <p className="text-center mt-8 text-slate-500 text-sm font-medium">
           New to ClubKhata?{" "}
-          <Link to="/register" className="text-indigo-600 font-bold hover:text-indigo-700 hover:underline transition-all">
-            Resister your club here
-          </Link>
+          <Link to="/register" className="text-indigo-600 font-bold hover:text-indigo-700 hover:underline transition-all">Register your club here</Link>
         </p>
       </div>
     </div>
