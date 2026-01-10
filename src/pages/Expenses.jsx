@@ -45,10 +45,8 @@ export default function Expenses() {
       // 1. CHECK ACTIVE YEAR FIRST
       let activeYear = null;
       try {
-          console.log("Fetching active year...");
           const yearRes = await fetchActiveYear();
           activeYear = yearRes.data.data;
-          console.log("Active Year:", activeYear);
       } catch (e) {
           activeYear = null;
           console.error("Error fetching active year:", e);
