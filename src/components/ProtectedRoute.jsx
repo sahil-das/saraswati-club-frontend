@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { Loader2 } from "lucide-react"; // Import spinner icon
 
 export default function ProtectedRoute({ children, role }) {
   // 1. Get activeClub from context to check the user's role in the CURRENT club
@@ -7,9 +8,11 @@ export default function ProtectedRoute({ children, role }) {
 
   // ⏳ WAIT for auth check
   if (loading) {
+    // UPDATED: Use a proper centered spinner instead of plain text
     return (
-      <div className="h-screen flex items-center justify-center text-gray-500">
-        Loading...
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary-600 mb-4" />
+        <p className="text-slate-500 font-medium animate-pulse">Verifying access...</p>
       </div>
     );
   }

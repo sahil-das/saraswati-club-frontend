@@ -12,7 +12,12 @@ export default function LoadingOverlay() {
       role="status"
       aria-busy="true"
     >
-      <div className="flex flex-col items-center bg-white p-8 rounded-2xl shadow-2xl">
+      {/* CHANGES HERE:
+         1. bg-white -> bg-white/80 (80% opacity)
+         2. Added backdrop-blur-md (frosted glass effect)
+      */}
+      <div className="flex flex-col items-center bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl">
+        
         {/* CUSTOM LOGO ANIMATION */}
         <div className="relative flex items-center justify-center mb-4">
           {/* Outer Ring (Spinner) */}

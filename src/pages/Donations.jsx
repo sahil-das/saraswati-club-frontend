@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext"; 
 import api from "../api/axios"; 
 import { exportDonationsPDF } from "../utils/pdfExport"; 
-
+import { fetchActiveYear  } from "../api/years";
 // Icons
 import { 
   Plus, Search, Trash2, Heart, Receipt, Calendar, 
@@ -39,7 +39,9 @@ export default function Donations() {
       // 1. CHECK ACTIVE YEAR FIRST
       let activeYear = null;
       try {
-          const yearRes = await api.get("/years/active");
+        console.log("Fetching active year...");
+          const yearRes = await fetchActiveYear();
+          console.log("Active Year:", activeYear);
           activeYear = yearRes.data.data;
       } catch (e) {
           activeYear = null;

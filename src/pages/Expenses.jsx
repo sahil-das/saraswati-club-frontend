@@ -20,7 +20,7 @@ import { useToast } from "../context/ToastContext";
 import AddExpenseModal from "../components/AddExpenseModal"; 
 import CreateYearModal from "../components/CreateYearModal"; // 👈 Import Create Year Modal
 import { exportExpensesPDF } from "../utils/pdfExport"; 
-
+import { fetchActiveYear } from "../api/years";
 const CATEGORIES = ["Pandal", "Idol", "Light & Sound", "Food/Bhog", "Priest/Puja", "Transport", "Miscellaneous"];
 
 export default function Expenses() {
@@ -41,13 +41,17 @@ export default function Expenses() {
     try {
       setLoading(true);
 
+      console
       // 1. CHECK ACTIVE YEAR FIRST
       let activeYear = null;
       try {
-          const yearRes = await api.get("/years/active");
+          console.log("Fetching active year...");
+          const yearRes = await fetchActiveYear();
           activeYear = yearRes.data.data;
+          console.log("Active Year:", activeYear);
       } catch (e) {
           activeYear = null;
+          console.error("Error fetching active year:", e);
       }
       
       setCycle(activeYear);

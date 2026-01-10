@@ -35,7 +35,9 @@ export default function Members() {
   const loadMembers = async () => {
     try {
       setLoading(true);
+      console.log("Loading members...");
       const res = await fetchMembers();
+      console.log("Members loaded:", res.data.data.length);
       setMembers(res.data.data);
     } catch (err) {
       console.error(err);
