@@ -9,7 +9,8 @@ import SkeletonCard from "../loading/SkeletonCard";
 
 import { 
   Search, UserPlus, Phone, MessageCircle, ShieldCheck, 
-  Trash2, Loader2, User, ChevronRight, Download
+  Trash2, Loader2, User, ChevronRight, Download,
+  LayoutGrid, List // 👈 Added Icons for View Toggle
 } from "lucide-react";
 
 import { Button } from "../components/ui/Button";
@@ -22,9 +23,10 @@ export default function Members() {
   const toast = useToast();
   
   const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true); // Initial load
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [viewMode, setViewMode] = useState("grid"); // 👈 State for View Mode ('grid' | 'list')
   
   const [confirmAction, setConfirmAction] = useState({ 
     isOpen: false, type: null, id: null, data: null, title: "", message: "", isDangerous: false
@@ -41,7 +43,6 @@ export default function Members() {
       console.error(err);
       toast.error("Failed to load members");
     } finally {
-      // Small delay to prevent immediate flash if data is cached/fast
       setLoading(false);
     }
   };
@@ -74,29 +75,21 @@ export default function Members() {
       
       try {
         if (confirmAction.type === 'delete') {
-          // 1. Optimistic Update: Remove from UI immediately
           setMembers(prev => prev.filter(m => m.membershipId !== confirmAction.id));
-          setConfirmAction({ ...confirmAction, isOpen: false }); // Close modal immediately
-
-          // 2. Perform API call
+          setConfirmAction({ ...confirmAction, isOpen: false }); 
           await deleteMember(confirmAction.id);
           toast.success("Member removed");
 
         } else if (confirmAction.type === 'role') {
-           // 1. Optimistic Update
            setMembers(prev => prev.map(m => m.membershipId === confirmAction.id ? { ...m, role: confirmAction.data } : m));
            setConfirmAction({ ...confirmAction, isOpen: false });
-
-           // 2. Perform API call
            await updateMemberRole(confirmAction.id, { role: confirmAction.data });
            toast.success("Role updated");
         }
       } catch(e) { 
-          // 3. Rollback on Error
           setMembers(previousMembers);
           toast.error(e.response?.data?.message || "Action failed"); 
       }
-      // Ensure modal is closed if not already
       setConfirmAction(prev => ({ ...prev, isOpen: false }));
   };
 
@@ -107,12 +100,8 @@ export default function Members() {
     );
   }, [members, searchTerm]);
 
-  // Wrapped export handler to return promise for button loader
   const handleExportWrapper = async () => {
-     // Simulate async generation if it were heavy, 
-     // or just allow the InlineButton to handle the UI feedback
      return new Promise(resolve => {
-        // Logic...
         const dataToExport = filteredMembers.map(m => {
             if (isAdmin) return m;
             return { name: m.name, email: m.email, role: m.role, joinedAt: m.joinedAt };
@@ -122,7 +111,6 @@ export default function Members() {
             members: dataToExport,
             showPhone: isAdmin 
         });
-        // Resolve after short delay to show the spinner
         setTimeout(resolve, 800); 
      });
   };
@@ -130,6 +118,7 @@ export default function Members() {
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
       
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Members</h1>
@@ -139,7 +128,6 @@ export default function Members() {
         </div>
         
         <div className="flex gap-2 w-full md:w-auto">
-             {/* Use InlineButton for visual feedback */}
              <InlineButton 
                 variant="secondary"
                 onClick={handleExportWrapper}
@@ -154,86 +142,222 @@ export default function Members() {
         </div>
       </div>
 
-      <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
-        <Search className="text-slate-400 ml-2" size={20} />
-        <input 
-          type="text"
-          placeholder="Search by name..."
-          className="flex-1 outline-none text-sm p-2 text-slate-700 placeholder:text-slate-400"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* TOOLBAR: SEARCH & VIEW TOGGLE */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Search */}
+        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 flex-1">
+          <Search className="text-slate-400 ml-2" size={20} />
+          <input 
+            type="text"
+            placeholder="Search by name..."
+            className="flex-1 outline-none text-sm p-2 text-slate-700 placeholder:text-slate-400"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        {/* View Toggle Buttons */}
+        <div className="bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex items-center gap-1 shrink-0">
+          <button 
+            onClick={() => setViewMode("grid")}
+            className={`p-2 rounded-lg transition-all ${
+              viewMode === "grid" 
+                ? "bg-slate-100 text-slate-900 shadow-sm" 
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+            }`}
+            title="Grid View"
+          >
+            <LayoutGrid size={20} />
+          </button>
+          <button 
+            onClick={() => setViewMode("list")}
+            className={`p-2 rounded-lg transition-all ${
+              viewMode === "list" 
+                ? "bg-slate-100 text-slate-900 shadow-sm" 
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+            }`}
+            title="List View"
+          >
+            <List size={20} />
+          </button>
+        </div>
       </div>
 
-      {/* MEMBER LIST GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        
-        {/* Render Skeletons when loading */}
-        {loading && Array.from({ length: 6 }).map((_, i) => (
-           <SkeletonCard key={i} />
-        ))}
-
-        {/* Render Actual Data when loaded */}
-        {!loading && filteredMembers.map((member) => {
-          const Wrapper = isAdmin ? Link : 'div';
-          const wrapperProps = isAdmin 
-            ? { to: `/members/${member.membershipId}`, className: "flex items-center gap-3 flex-1 group-hover:opacity-80 transition-opacity" }
-            : { className: "flex items-center gap-3 flex-1" };
-
-          return (
-            <div key={member.membershipId} className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all relative">
-              <div className="flex justify-between items-start">
-                 <Wrapper {...wrapperProps}>
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${
-                      member.role === 'admin' 
-                        ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500 ring-offset-2" 
-                        : "bg-slate-100 text-slate-600"
-                    }`}>
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
-                    
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-slate-800 truncate flex items-center gap-1">
-                          {member.name} 
-                          {isAdmin && <ChevronRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                      </h3>
-                      
-                      <div className="flex flex-col gap-0.5 mt-0.5">
-                          <span className={`w-fit text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                            member.role === 'admin' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-slate-50 text-slate-500 border-slate-100"
-                          }`}>
-                            {member.role}
-                          </span>
-                          <span className="text-[11px] text-slate-400 truncate">
-                            {member.email}
-                          </span>
-                      </div>
-                    </div>
-                 </Wrapper>
-
-                 {isAdmin && (
-                   <div className="flex gap-1">
-                      <button onClick={() => initiateRoleToggle(member)} className={`p-2 rounded-lg transition-colors ${member.role === 'admin' ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:bg-slate-50"}`}>
-                        <ShieldCheck size={18} />
-                      </button>
-                      <button onClick={() => initiateDelete(member.membershipId)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 size={18} />
-                      </button>
-                   </div>
-                 )}
-              </div>
-              
-              {/* (Existing contact details code omitted for brevity but should be preserved) */}
-            </div>
-          );
-        })}
-      </div>
-
-      {!loading && filteredMembers.length === 0 && (
+      {/* CONTENT: LOADING / GRID / LIST */}
+      {loading ? (
+        // LOADING STATE (Use Card Skeletons for simplicity)
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+           {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : filteredMembers.length === 0 ? (
+        // EMPTY STATE
          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <User className="w-12 h-12 mb-2 opacity-20" />
             <p>No members found.</p>
          </div>
+      ) : (
+        <>
+          {/* ===================== GRID VIEW ===================== */}
+          {viewMode === "grid" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredMembers.map((member) => {
+                const Wrapper = isAdmin ? Link : 'div';
+                const wrapperProps = isAdmin 
+                  ? { to: `/members/${member.membershipId}`, className: "flex items-center gap-3 flex-1 group-hover:opacity-80 transition-opacity" }
+                  : { className: "flex items-center gap-3 flex-1" };
+
+                return (
+                  <div key={member.membershipId} className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all relative">
+                    <div className="flex justify-between items-start">
+                       <Wrapper {...wrapperProps}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${
+                            member.role === 'admin' 
+                              ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500 ring-offset-2" 
+                              : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {member.name.charAt(0).toUpperCase()}
+                          </div>
+                          
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-800 truncate flex items-center gap-1">
+                                {member.name} 
+                                {isAdmin && <ChevronRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                            </h3>
+                            
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                                <span className={`w-fit text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                  member.role === 'admin' ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                                }`}>
+                                  {member.role}
+                                </span>
+                                <span className="text-[11px] text-slate-400 truncate">
+                                  {member.email}
+                                </span>
+                            </div>
+                          </div>
+                       </Wrapper>
+
+                       {isAdmin && (
+                         <div className="flex gap-1">
+                            <button onClick={() => initiateRoleToggle(member)} className={`p-2 rounded-lg transition-colors ${member.role === 'admin' ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:bg-slate-50"}`}>
+                              <ShieldCheck size={18} />
+                            </button>
+                            <button onClick={() => initiateDelete(member.membershipId)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                              <Trash2 size={18} />
+                            </button>
+                         </div>
+                       )}
+                    </div>
+
+                    {isAdmin && member.phone && (
+                      <div className="mt-4 space-y-2 pl-1">
+                          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                            <Phone size={14} className="shrink-0" /> {member.phone}
+                          </div>
+                      </div>
+                    )}
+                    
+                    {/* Mobile Quick Actions (Grid Only) */}
+                    {isAdmin && member.phone && (
+                       <div className="mt-4 pt-3 border-t border-slate-50 grid grid-cols-2 gap-3">
+                          <a href={`tel:${member.phone}`} className="flex items-center justify-center gap-2 py-2 rounded-lg bg-slate-50 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors">
+                            <Phone size={14} /> Call
+                          </a>
+                          <button onClick={() => window.open(`https://wa.me/${member.phone.replace(/\D/g,'')}`, '_blank')} className="flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors">
+                            <MessageCircle size={14} /> WhatsApp
+                          </button>
+                       </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ===================== LIST VIEW ===================== */}
+          {viewMode === "list" && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Member</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Role</th>
+                      {isAdmin && <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Contact</th>}
+                      {isAdmin && <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredMembers.map((member) => {
+                      const Wrapper = isAdmin ? Link : 'div';
+                      const wrapperProps = isAdmin 
+                        ? { to: `/members/${member.membershipId}`, className: "group flex items-center gap-3" }
+                        : { className: "flex items-center gap-3" };
+
+                      return (
+                        <tr key={member.membershipId} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                             <Wrapper {...wrapperProps}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                                  member.role === 'admin' 
+                                    ? "bg-indigo-100 text-indigo-700" 
+                                    : "bg-slate-100 text-slate-600"
+                                }`}>
+                                  {member.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                   <div className="font-bold text-slate-800 flex items-center gap-2">
+                                     {member.name}
+                                     {isAdmin && <ChevronRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                                   </div>
+                                   <div className="text-slate-400 text-xs">{member.email}</div>
+                                </div>
+                             </Wrapper>
+                          </td>
+                          <td className="px-6 py-4">
+                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
+                                member.role === 'admin' 
+                                  ? "bg-indigo-50 text-indigo-700 border-indigo-100" 
+                                  : "bg-slate-50 text-slate-500 border-slate-100"
+                             }`}>
+                                {member.role}
+                             </span>
+                          </td>
+                          {isAdmin && (
+                            <td className="px-6 py-4 text-slate-500 font-medium">
+                               {member.phone ? (
+                                 <div className="flex gap-3">
+                                   <a href={`tel:${member.phone}`} className="hover:text-slate-800" title="Call">
+                                     {member.phone}
+                                   </a>
+                                   <button onClick={() => window.open(`https://wa.me/${member.phone.replace(/\D/g,'')}`, '_blank')} className="text-emerald-600 hover:text-emerald-700" title="WhatsApp">
+                                      <MessageCircle size={16} />
+                                   </button>
+                                 </div>
+                               ) : <span className="text-slate-300 italic">No phone</span>}
+                            </td>
+                          )}
+                          {isAdmin && (
+                            <td className="px-6 py-4 text-right">
+                               <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => initiateRoleToggle(member)} className={`p-2 rounded-lg transition-colors ${member.role === 'admin' ? "bg-indigo-50 text-indigo-600" : "text-slate-300 hover:bg-slate-100 hover:text-slate-600"}`} title="Toggle Role">
+                                    <ShieldCheck size={18} />
+                                  </button>
+                                  <button onClick={() => initiateDelete(member.membershipId)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete Member">
+                                    <Trash2 size={18} />
+                                  </button>
+                               </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {showAddModal && <AddMemberModal onClose={() => setShowAddModal(false)} refresh={loadMembers} />}
