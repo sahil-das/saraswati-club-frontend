@@ -250,7 +250,7 @@ export default function DashboardHome() {
                     label={frequency === 'weekly' ? 'Weekly collection' : 'Monthly collection'} 
                     amount={data?.breakdown?.subscriptions} 
                     color="indigo"
-                    onClick={() => navigate('/collections')}
+                    onClick={() => navigate('/contributions')}
                   />
                 )}
 
