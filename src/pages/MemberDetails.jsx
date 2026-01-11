@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, data } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -8,13 +8,14 @@ import {
   CheckCircle, IndianRupee, CreditCard, AlertCircle, 
   Mail, Hash, ShieldCheck, Shield, Lock, ChevronDown, ChevronUp
 } from "lucide-react";
-import { clsx } from "clsx";
+import clsx from "clsx";
 
 // Components
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import AddPujaModal from "../components/AddPujaModal"; 
+import { set } from "nprogress";
 
 // 🛠 HELPER: Handle both Paisa Integers (20000) and Rupee Strings ("200.00")
 const parseAmount = (val) => {
@@ -35,6 +36,7 @@ export default function MemberDetails() {
   const [member, setMember] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [frequency, setFrequency] = useState("weekly"); 
+  const [installmentAmount, setInstallmentAmount]= useState(null);
   const [chandaHistory, setChandaHistory] = useState([]);
   const [stats, setStats] = useState({ subPaid: 0, subDue: 0, chandaPaid: 0 });
    
@@ -69,10 +71,15 @@ export default function MemberDetails() {
         role: data.member?.role || "member",
         phone: data.member?.phone || "No Phone",
         email: data.member?.email || "No Email",
-        joinedYear: data.year?.name
+        personalEmail: data.member?.personalEmail || "N/A",
+        joinedYear: data.member?.joinedAt || "N/A",
+        joinedAt: data.member?.joinedAt || "N/A"
       });
 
       setSubscription(data.subscription);
+      setInstallmentAmount(parseAmount(data.year?.amountPerInstallment) || 0);
+      
+      console.log("Fetched Subscription:", data.subscription);
       setFrequency(data.year?.frequency || "weekly");
 
       // 3. Fetch Puja Fees
@@ -186,16 +193,21 @@ export default function MemberDetails() {
                         {member.role}
                     </span>
                 </div>
+                {member.joinedAt && (
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </p>
+                )}
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-x-6 gap-y-2 mt-3 text-sm text-[var(--text-muted)] font-medium">
                    <div className="flex items-center gap-2">
                         <Phone size={14} className="opacity-70 shrink-0"/> <span className="text-[var(--text-main)]">{member.phone}</span>
                    </div>
                    <div className="flex items-center gap-2">
-                        <Hash size={14} className="opacity-70 shrink-0"/> <span>ID: <span className="font-mono text-[var(--text-main)]">{member.clubId}</span></span>
+                        <Hash size={14} className="opacity-70 shrink-0"/> <span>User ID: <span className="font-mono text-[var(--text-main)]">{member.email}</span></span>
                    </div>
                    <div className="flex items-center gap-2">
-                        <Mail size={14} className="opacity-70 shrink-0"/> <span className="truncate max-w-[200px]">{member.email}</span>
+                        <Mail size={14} className="opacity-70 shrink-0"/> <span className="truncate max-w-[200px]">{member.personalEmail}</span>
                    </div>
                 </div>
              </div>
@@ -250,7 +262,7 @@ export default function MemberDetails() {
                           </div>
                           
                           <p className="text-sm text-[var(--text-muted)] mt-1 pl-7">
-                            {frequency === 'monthly' ? 'Monthly' : 'Weekly'} Plan • <span className="font-bold text-[var(--text-main)]">₹{parseAmount(subscription?.year?.amountPerInstallment)}</span> / period
+                            {frequency === 'monthly' ? 'Monthly' : 'Weekly'} Plan • <span className="font-bold text-[var(--text-main)]">₹{installmentAmount}</span> / period
                           </p>
                         </button>
                     </div>
@@ -314,7 +326,7 @@ export default function MemberDetails() {
                 <Card className="min-h-[300px]">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-[var(--text-main)] flex items-center gap-2">
-                        <IndianRupee className="text-rose-500" size={18} /> Puja Fees
+                        <IndianRupee className="text-rose-500" size={18} /> Festival Fees
                         </h3>
                     </div>
                     {chandaHistory.length === 0 ? (
