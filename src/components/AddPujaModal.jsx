@@ -68,8 +68,8 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-fade-in">
+      <div className="bg-[var(--bg-card)] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-[var(--border-color)]">
         
         {/* HEADER */}
         <div className="bg-rose-600 px-6 py-4 flex justify-between items-center text-white">
@@ -89,16 +89,16 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
            {/* ✅ FIX: HIDE Member Selection if ID is pre-selected */}
            {!preSelectedMemberId && (
                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Member</label>
+                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 ml-1">Member</label>
                   <div className="relative">
                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                      <select 
                          {...register("userId", { required: true })}
-                         className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
+                         className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-main)] text-sm rounded-xl pl-10 pr-10 py-3 appearance-none outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 dark:focus:ring-rose-500/20"
                      >
                          <option value="">Select Member...</option>
                          {members.map(m => (
-                             <option key={m.userId} value={m.userId}>{m.name}</option>
+                            <option key={m.userId} value={m.userId}>{m.name}</option>
                          ))}
                      </select>
                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
@@ -112,6 +112,7 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
               icon={IndianRupee}
               placeholder="e.g. 250"
               {...register("amount", { required: true })}
+              className="bg-[var(--bg-input)]"
            />
 
            <Input 
@@ -119,12 +120,13 @@ export default function AddPujaModal({ onClose, refresh, preSelectedMemberId }) 
               icon={FileText}
               placeholder="e.g. Late fee / Special Chanda"
               {...register("notes")}
+              className="bg-[var(--bg-input)]"
            />
 
            <div className="pt-2">
               <Button 
                 type="submit" 
-                className="w-full bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 border-none"
+                className="w-full bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 dark:shadow-none border-none text-white"
                 isLoading={loading}
               >
                  Record Fee

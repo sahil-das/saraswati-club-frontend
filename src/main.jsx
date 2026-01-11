@@ -7,16 +7,19 @@ import "nprogress/nprogress.css";
 
 import { AuthProvider } from "./context/AuthContext";
 import { YearProvider } from "./context/YearContext";
-import { LoadingProvider } from "./loading/LoadingContext"; // Import Provider
+import { LoadingProvider } from "./loading/LoadingContext";
+import { ThemeProvider } from "./context/ThemeContext"; // Import ThemeProvider
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <LoadingProvider> {/* Wrap App */}
-      <AuthProvider>
-        <YearProvider>
-          <App />
-        </YearProvider>
-      </AuthProvider>
-    </LoadingProvider>
+    <ThemeProvider> {/* Add ThemeProvider at the top level */}
+      <LoadingProvider>
+        <AuthProvider>
+          <YearProvider>
+            <App />
+          </YearProvider>
+        </AuthProvider>
+      </LoadingProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );

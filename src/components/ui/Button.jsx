@@ -3,7 +3,6 @@ import { Loader2 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-// Utility for merging tailwind classes safely
 function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
@@ -20,14 +19,18 @@ export const Button = React.forwardRef(({
   ...props 
 }, ref) => {
   
-  const baseStyles = "inline-flex items-center justify-center rounded-[var(--radius-button)] font-bold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-primary-200";
+  const baseStyles = "inline-flex items-center justify-center rounded-[var(--radius-button)] font-bold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-primary-200 dark:focus-visible:ring-primary-900";
   
   const variants = {
-    primary: "bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-200",
-    secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm",
-    ghost: "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-    danger: "bg-red-50 text-red-600 border border-red-100 hover:bg-red-100",
-    outline: "border-2 border-primary-600 text-primary-600 hover:bg-primary-50"
+    primary: "bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-200 dark:shadow-none",
+    
+    secondary: "bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-color)] hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm",
+    
+    ghost: "bg-transparent text-[var(--text-muted)] hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[var(--text-main)]",
+    
+    danger: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/40",
+    
+    outline: "border-2 border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20"
   };
 
   const sizes = {

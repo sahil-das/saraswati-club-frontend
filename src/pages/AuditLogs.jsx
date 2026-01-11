@@ -19,7 +19,7 @@ export default function AuditLogs() {
     startDate: "",
     endDate: "",
     festivalYearId: "", 
-    lastMonths: "1" // Default fallback if no active year found
+    lastMonths: "1" 
   });
 
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -28,12 +28,10 @@ export default function AuditLogs() {
   useEffect(() => {
     const fetchYears = async () => {
         try {
-            // ✅ Ensure this matches your Backend Route (usually /years)
             const res = await api.get("/years"); 
             if (res.data.success && Array.isArray(res.data.data)) {
                 setYears(res.data.data);
                 
-                // Set active year as default
                 try {
                     const activeRes = await api.get("/years/active");
                     const activeYear = activeRes.data.data;
@@ -41,7 +39,7 @@ export default function AuditLogs() {
                         setFilters(prev => ({ 
                             ...prev, 
                             festivalYearId: activeYear._id,
-                            lastMonths: "" // 👈 FIX: Clear 'Last 30 Days' so range isn't locked
+                            lastMonths: "" 
                         }));
                     }
                 } catch (err) {
@@ -209,26 +207,26 @@ export default function AuditLogs() {
     <div className="max-w-6xl mx-auto space-y-6 pb-10 animate-fade-in">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-color)] pb-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-gray-900 text-white rounded-xl shadow-lg">
+          <div className="p-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl shadow-lg">
              <Shield size={24} />
           </div>
           <div>
-             <h1 className="text-2xl font-bold text-gray-800">Audit Logs</h1>
-             <p className="text-gray-500 text-sm">Track all administrative actions.</p>
+             <h1 className="text-2xl font-bold text-[var(--text-main)]">Audit Logs</h1>
+             <p className="text-[var(--text-muted)] text-sm">Track all administrative actions.</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-           <div className="text-right text-sm text-gray-500 hidden sm:block">
-             Total Records: <span className="font-bold text-indigo-600">{pagination.total}</span>
+           <div className="text-right text-sm text-[var(--text-muted)] hidden sm:block">
+             Total Records: <span className="font-bold text-primary-600 dark:text-primary-400">{pagination.total}</span>
            </div>
            
            <button 
              onClick={handleExport}
              disabled={loading || exporting || pagination.total === 0}
-             className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+             className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
            >
              {exporting ? (
                <><Loader2 size={16} className="animate-spin" /> Generating...</>
@@ -240,13 +238,13 @@ export default function AuditLogs() {
       </div>
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-[var(--bg-card)] p-4 rounded-xl shadow-sm border border-[var(--border-color)] grid grid-cols-1 md:grid-cols-4 gap-4">
         
         {/* Action Type */}
         <div>
-          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Action Type</label>
+          <label className="text-xs font-bold text-[var(--text-muted)] uppercase block mb-1">Action Type</label>
           <select 
-            className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full p-2 border border-[var(--border-color)] rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 bg-[var(--bg-input)] text-[var(--text-main)]"
             value={filters.action}
             onChange={(e) => handleFilterChange("action", e.target.value)}
           >
@@ -261,14 +259,13 @@ export default function AuditLogs() {
           </select>
         </div>
 
-        {/* Quick Range (FIXED: Removed 'disabled') */}
+        {/* Quick Range */}
         <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Quick Range</label>
+            <label className="text-xs font-bold text-[var(--text-muted)] uppercase block mb-1">Quick Range</label>
             <select 
-                className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full p-2 border border-[var(--border-color)] rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 bg-[var(--bg-input)] text-[var(--text-main)]"
                 value={filters.lastMonths}
                 onChange={(e) => handleFilterChange("lastMonths", e.target.value)}
-                // 🛑 DISABLED PROP REMOVED HERE so user can click it to switch
             >
                 <option value="">Select Range...</option>
                 <option value="1">Last 30 Days</option>
@@ -276,14 +273,13 @@ export default function AuditLogs() {
             </select>
         </div>
 
-        {/* Festival Year (FIXED: Removed 'disabled') */}
+        {/* Festival Year */}
         <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Festival Cycle</label>
+            <label className="text-xs font-bold text-[var(--text-muted)] uppercase block mb-1">Festival Cycle</label>
             <select 
-                className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full p-2 border border-[var(--border-color)] rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500 bg-[var(--bg-input)] text-[var(--text-main)]"
                 value={filters.festivalYearId}
                 onChange={(e) => handleFilterChange("festivalYearId", e.target.value)}
-                 // 🛑 DISABLED PROP REMOVED HERE
             >
                 <option value="">All Cycles</option>
                 {years.map(y => (
@@ -296,70 +292,70 @@ export default function AuditLogs() {
         <div className="flex items-end">
             <button 
                 onClick={() => setFilters({ action: "ALL", startDate: "", endDate: "", festivalYearId: filters.festivalYearId, lastMonths: "" })}
-                className="w-full px-4 py-2 text-sm text-red-500 border border-red-200 hover:bg-red-50 rounded-lg transition font-medium"
+                className="w-full px-4 py-2 text-sm text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition font-medium"
             >
                 Reset Filters
             </button>
         </div>
 
         {/* Manual Date */}
-        <div className="md:col-span-4 flex gap-4 items-center pt-2 border-t border-dashed mt-2">
-            <span className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
+        <div className="md:col-span-4 flex gap-4 items-center pt-2 border-t border-dashed border-[var(--border-color)] mt-2">
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase flex items-center gap-1">
                 <Calendar size={12}/> Custom Date Override (Max 3 Months):
             </span>
             <input 
                 type="date" 
-                className="p-1.5 border rounded-md text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                className="p-1.5 border border-[var(--border-color)] rounded-md text-xs outline-none focus:ring-2 focus:ring-primary-500 bg-[var(--bg-input)] text-[var(--text-main)]"
                 value={filters.startDate}
                 max={filters.endDate || undefined}
                 onChange={(e) => handleFilterChange("startDate", e.target.value)}
             />
-            <span className="text-gray-400">-</span>
+            <span className="text-[var(--text-muted)]">-</span>
             <input 
                 type="date" 
-                className="p-1.5 border rounded-md text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                className="p-1.5 border border-[var(--border-color)] rounded-md text-xs outline-none focus:ring-2 focus:ring-primary-500 bg-[var(--bg-input)] text-[var(--text-main)]"
                 value={filters.endDate}
                 min={filters.startDate || undefined}
                 max={getMaxEndDate()}
                 onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                disabled={!filters.startDate} // Keep this disabled until start date is picked
+                disabled={!filters.startDate}
             />
         </div>
 
       </div>
 
-      {/* LOGS LIST (No changes needed here) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px]">
+      {/* LOGS LIST */}
+      <div className="bg-[var(--bg-card)] rounded-2xl shadow-sm border border-[var(--border-color)] overflow-hidden min-h-[400px]">
         {loading ? (
-          <div className="flex justify-center items-center h-64 text-indigo-600">
+          <div className="flex justify-center items-center h-64 text-primary-600">
             <Loader2 className="animate-spin w-8 h-8" />
           </div>
         ) : logs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-64 text-[var(--text-muted)]">
             <Filter className="w-12 h-12 mb-2 opacity-20"/>
             <p>No logs found matching your filters.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-[var(--border-color)]">
             {logs.map((log) => (
-              <div key={log._id} className="p-5 hover:bg-gray-50 transition-colors flex gap-4 group">
+              <div key={log._id} className="p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex gap-4 group">
                 <div className={`mt-1 p-2 rounded-lg shrink-0 h-fit ${getActionColor(log.action)}`}>
                    <Activity size={18} />
                 </div>
                 <div className="flex-1">
                    <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-bold text-gray-800 text-sm">{formatAction(log.action)}</h4>
-                        <p className="text-sm text-gray-600 mt-0.5">{log.target}</p>
+                        <h4 className="font-bold text-[var(--text-main)] text-sm">{formatAction(log.action)}</h4>
+                        <p className="text-sm text-[var(--text-muted)] mt-0.5">{log.target}</p>
                       </div>
-                      <span className="text-xs font-mono text-gray-400 whitespace-nowrap flex items-center gap-1">
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap flex items-center gap-1">
                         <Clock size={12}/> 
                         {new Date(log.createdAt).toLocaleDateString()} 
                         <span className="hidden sm:inline"> {new Date(log.createdAt).toLocaleTimeString()}</span>
                       </span>
                    </div>
                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-gray-500 bg-gray-100 px-2 py-1 rounded-md w-fit">
+                      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md w-fit">
                         <User size={12} />
                         <span className="font-medium">{log.actor?.name || "System"}</span>
                       </div>
@@ -382,17 +378,17 @@ export default function AuditLogs() {
           <button 
             disabled={pagination.page === 1}
             onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
-            className="p-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            className="p-2 border border-[var(--border-color)] rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 text-[var(--text-main)]"
           >
             <ChevronLeft size={20} />
           </button>
-          <span className="px-4 py-2 bg-white border rounded-lg text-sm font-medium text-gray-600">
+          <span className="px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-sm font-medium text-[var(--text-muted)]">
             Page {pagination.page} of {pagination.pages}
           </span>
           <button 
             disabled={pagination.page === pagination.pages}
             onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-            className="p-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            className="p-2 border border-[var(--border-color)] rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 text-[var(--text-main)]"
           >
             <ChevronRight size={20} />
           </button>
@@ -412,11 +408,15 @@ function formatAction(action) {
 
 function getActionColor(action) {
   const a = action?.toLowerCase() || "";
-  if (a.includes("delete") || a.includes("remove") || a.includes("reject") || a.includes("undo")) return "bg-red-100 text-red-600";
-  if (a.includes("update") || a.includes("edit")) return "bg-orange-100 text-orange-600";
-  if (a.includes("create") || a.includes("add") || a.includes("approve") || a.includes("start")) return "bg-emerald-100 text-emerald-600";
-  if (a.includes("pay") || a.includes("fee") || a.includes("collect")) return "bg-indigo-100 text-indigo-600";
-  return "bg-gray-100 text-gray-600";
+  if (a.includes("delete") || a.includes("remove") || a.includes("reject") || a.includes("undo")) 
+    return "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400";
+  if (a.includes("update") || a.includes("edit")) 
+    return "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400";
+  if (a.includes("create") || a.includes("add") || a.includes("approve") || a.includes("start")) 
+    return "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400";
+  if (a.includes("pay") || a.includes("fee") || a.includes("collect")) 
+    return "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400";
+  return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400";
 }
 
 function renderDetails(details) {
@@ -442,11 +442,11 @@ function renderDetails(details) {
     
     const isStatus = key.toLowerCase().includes("status") || key.toLowerCase().includes("role") || key.toLowerCase().includes("frequency");
     const badgeClass = isStatus 
-      ? "bg-indigo-50 text-indigo-700 font-bold px-1.5 py-0.5 rounded uppercase text-[10px]" 
-      : "text-gray-700 font-medium";
+      ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold px-1.5 py-0.5 rounded uppercase text-[10px]" 
+      : "text-slate-700 dark:text-slate-300 font-medium";
 
     return (
-      <span key={key} className="flex items-center text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-md shadow-sm">
+      <span key={key} className="flex items-center text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-color)] px-2 py-1 rounded-md shadow-sm text-xs">
         <span className="mr-1 opacity-70">{label}:</span>
         <span className={badgeClass}>{displayValue}</span>
       </span>

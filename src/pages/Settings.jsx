@@ -51,15 +51,18 @@ export default function Settings() {
       const res = await fetchActiveYear();
       const d = res.data.data;
       
-      // ✅ FIX: Explicitly handle "No Data" (d is null) inside the try block
       if (d) {
         setNoActiveCycle(false);
         setActiveYearId(d._id);
         
         // Check for existing payments to lock critical fields
-        const financeRes = await api.get("/finance/summary");
-        const subscriptionIncome = financeRes.data.data?.breakdown?.subscriptions || 0;
-        setHasExistingPayments(subscriptionIncome > 0); 
+        try {
+            const financeRes = await api.get("/finance/summary");
+            const subscriptionIncome = financeRes.data.data?.breakdown?.subscriptions || 0;
+            setHasExistingPayments(subscriptionIncome > 0); 
+        } catch (e) {
+            console.warn("Failed to check existing payments");
+        }
         
         setIsEditing(false);
         
@@ -73,11 +76,9 @@ export default function Settings() {
           openingBalance: d.openingBalance || 0,
         });
       } else {
-        // ✅ API returned 200 OK but null data -> Switch to Setup Mode
         handleNoActiveYear();
       }
     } catch (err) {
-      // ✅ API Error (404/500) -> Switch to Setup Mode
       handleNoActiveYear();
     } finally {
       setLoading(false);
@@ -117,10 +118,7 @@ export default function Settings() {
     setLoading(true);
     try {
       if (noActiveCycle) {
-        // 🚨 FIX: Prepare payload to handle "none" frequency validation
         const payload = { ...formData };
-        
-        // If frequency is 'none', send undefined for installments to bypass Joi .min(1)
         if (payload.subscriptionFrequency === 'none') {
             payload.totalInstallments = undefined;
         }
@@ -158,7 +156,7 @@ export default function Settings() {
 
   const totalExpected = formData.amountPerInstallment * formData.totalInstallments;
 
-  if (loading && !formData.name) return <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
+  if (loading && !formData.name) return <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-primary-600"/></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
@@ -166,8 +164,8 @@ export default function Settings() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">System Settings</h2>
-          <p className="text-slate-500 text-sm">
+          <h2 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">System Settings</h2>
+          <p className="text-[var(--text-muted)] text-sm">
             {noActiveCycle ? "Setup a new financial year." : "Manage active cycle configuration."}
           </p>
         </div>
@@ -187,61 +185,61 @@ export default function Settings() {
       {!isEditing && !noActiveCycle && (
         <div className="space-y-6">
             {/* Main Info Card */}
-            <Card className="overflow-hidden border-slate-200" noPadding>
-                <div className="bg-slate-50/50 px-8 py-6 border-b border-slate-100">
+            <Card className="overflow-hidden border-[var(--border-color)]" noPadding>
+                <div className="bg-slate-50/50 dark:bg-slate-800/50 px-8 py-6 border-b border-[var(--border-color)]">
                     <div className="flex items-center gap-3 mb-2">
-                        <span className="bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200 uppercase tracking-wider flex items-center gap-1">
+                        <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200 dark:border-emerald-900/50 uppercase tracking-wider flex items-center gap-1">
                           <CheckCircle size={10} /> Active Year
                         </span>
-                        <span className="text-slate-400 text-sm font-medium flex items-center gap-1">
+                        <span className="text-[var(--text-muted)] text-sm font-medium flex items-center gap-1">
                           <Clock size={14}/> {new Date(formData.startDate).getFullYear()}
                         </span>
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{formData.name}</h1>
+                    <h1 className="text-3xl font-bold text-[var(--text-main)] tracking-tight">{formData.name}</h1>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2">
-                    <div className="p-8 space-y-8 border-r border-slate-100">
+                    <div className="p-8 space-y-8 border-r border-[var(--border-color)]">
                           <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Duration</label>
-                            <div className="flex items-center gap-2 text-slate-700 font-medium bg-slate-50 inline-flex px-3 py-1.5 rounded-lg border border-slate-100">
-                                <Calendar size={16} className="text-slate-400"/>
+                            <label className="text-xs font-bold text-[var(--text-muted)] uppercase block mb-1">Duration</label>
+                            <div className="flex items-center gap-2 text-[var(--text-main)] font-medium bg-slate-50 dark:bg-slate-800 inline-flex px-3 py-1.5 rounded-lg border border-[var(--border-color)]">
+                                <Calendar size={16} className="text-[var(--text-muted)]"/>
                                 {new Date(formData.startDate).toLocaleDateString()} 
-                                <span className="text-slate-300">➝</span>
+                                <span className="text-[var(--text-muted)]">➝</span>
                                 {new Date(formData.endDate).toLocaleDateString()}
                             </div>
                         </div>
 
                         <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Collection Rule</label>
-                            <p className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <label className="text-xs font-bold text-[var(--text-muted)] uppercase block mb-1">Collection Rule</label>
+                            <p className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
                                 {getFrequencyLabel(formData.subscriptionFrequency)}
                             </p>
                             {formData.subscriptionFrequency !== 'none' && (
-                                <p className="text-sm text-slate-500 mt-1">
-                                {formData.totalInstallments} installments of <span className="text-indigo-600 font-bold">₹{formData.amountPerInstallment}</span> each.
+                                <p className="text-sm text-[var(--text-muted)] mt-1">
+                                {formData.totalInstallments} installments of <span className="text-primary-600 dark:text-primary-400 font-bold">₹{formData.amountPerInstallment}</span> each.
                                 </p>
                             )}
                         </div>
                     </div>
 
-                    <div className="p-8 bg-slate-50/30 flex flex-col justify-center items-center text-center">
+                    <div className="p-8 bg-slate-50/30 dark:bg-slate-800/30 flex flex-col justify-center items-center text-center">
                         {formData.subscriptionFrequency !== 'none' ? (
                             <>
-                                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm ring-1 ring-indigo-100">
+                                <div className="w-16 h-16 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-2xl flex items-center justify-center mb-4 shadow-sm ring-1 ring-primary-100 dark:ring-primary-800">
                                     <Coins size={32} />
                                 </div>
-                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Projected Revenue</p>
-                                <p className="text-3xl font-bold text-slate-800 tracking-tight">₹ {totalExpected.toLocaleString()}</p>
-                                <p className="text-xs text-slate-400 mt-1">Target per member</p>
+                                <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Projected Revenue</p>
+                                <p className="text-3xl font-bold text-[var(--text-main)] tracking-tight">₹ {totalExpected.toLocaleString()}</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">Target per member</p>
                             </>
                         ) : (
                             <div className="text-center">
-                                <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm mx-auto">
+                                <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center mb-4 shadow-sm mx-auto">
                                     <Coins size={32} />
                                 </div>
-                                <p className="text-sm font-medium text-slate-600">Donation Only Mode</p>
-                                <p className="text-xs text-slate-400 italic mt-1">No recurring revenue projection.</p>
+                                <p className="text-sm font-medium text-[var(--text-main)]">Donation Only Mode</p>
+                                <p className="text-xs text-[var(--text-muted)] italic mt-1">No recurring revenue projection.</p>
                             </div>
                         )}
                     </div>
@@ -250,19 +248,19 @@ export default function Settings() {
 
             {/* DANGER ZONE */}
             {activeClub?.role === "admin" && (
-                <Card className="border-red-100 shadow-none overflow-hidden" noPadding>
-                      <div className="bg-red-50/50 p-6 border-b border-red-100 flex items-start gap-4">
-                        <div className="p-3 bg-red-100 text-red-600 rounded-xl shrink-0">
+                <Card className="border-red-100 dark:border-red-900/30 shadow-none overflow-hidden" noPadding>
+                      <div className="bg-red-50/50 dark:bg-red-900/10 p-6 border-b border-red-100 dark:border-red-900/30 flex items-start gap-4">
+                        <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl shrink-0">
                             <ShieldAlert size={24} />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-red-900">Danger Zone</h3>
-                            <p className="text-sm text-red-600/80 mt-1">
+                            <h3 className="text-lg font-bold text-red-900 dark:text-red-200">Danger Zone</h3>
+                            <p className="text-sm text-red-600/80 dark:text-red-400/80 mt-1">
                                 Closing the financial year is irreversible. It will freeze all current data and archive it for read-only access.
                             </p>
                         </div>
                       </div>
-                      <div className="p-6 bg-red-50/20">
+                      <div className="p-6 bg-red-50/20 dark:bg-red-900/5">
                         <Button 
                             variant="danger" 
                             onClick={() => setShowCloseConfirm(true)}
@@ -278,15 +276,15 @@ export default function Settings() {
 
       {/* ==================== EDIT/CREATE FORM ==================== */}
       {(isEditing || noActiveCycle) && (
-        <Card className={noActiveCycle ? "border-indigo-200 shadow-lg" : "border-slate-200"}>
+        <Card className={noActiveCycle ? "border-primary-200 dark:border-primary-800 shadow-lg" : "border-[var(--border-color)]"}>
           
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-            <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800">
-              {noActiveCycle ? <PlusCircle size={20} className="text-indigo-600"/> : <Edit3 size={20} className="text-slate-500"/>}
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-[var(--border-color)]">
+            <h3 className="font-bold text-lg flex items-center gap-2 text-[var(--text-main)]">
+              {noActiveCycle ? <PlusCircle size={20} className="text-primary-600 dark:text-primary-400"/> : <Edit3 size={20} className="text-[var(--text-muted)]"/>}
               {noActiveCycle ? "Setup New Year" : "Edit Configuration"}
             </h3>
             {!noActiveCycle && (
-              <button onClick={() => setIsEditing(false)} className="text-slate-400 hover:text-slate-600 transition">
+              <button onClick={() => setIsEditing(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
                 <X size={20}/>
               </button>
             )}
@@ -303,6 +301,7 @@ export default function Settings() {
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="e.g. Durga Puja 2026"
                         required
+                        className="bg-[var(--bg-input)]"
                     />
                 </div>
                 <div>
@@ -312,6 +311,7 @@ export default function Settings() {
                         value={formData.startDate}
                         onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                         required
+                        className="bg-[var(--bg-input)]"
                     />
                 </div>
                 <div>
@@ -322,16 +322,17 @@ export default function Settings() {
                         value={formData.endDate}
                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                         required
+                        className="bg-[var(--bg-input)]"
                     />
                 </div>
             </div>
 
-            <div className="h-px bg-slate-100 my-4" />
+            <div className="h-px bg-[var(--border-color)] my-4" />
 
             {/* Rules */}
             <div className="space-y-4">
-                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <Lock size={14} className="text-slate-400"/> Financial Rules
+                <h4 className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <Lock size={14} className="text-[var(--text-muted)]"/> Financial Rules
                 </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -339,7 +340,7 @@ export default function Settings() {
                     {/* FREQUENCY INPUT with INFO */}
                     <div>
                         <div className="flex items-center gap-2 mb-1.5 ml-1">
-                            <label className="block text-xs font-bold text-slate-500 uppercase">Frequency</label>
+                            <label className="block text-xs font-bold text-[var(--text-muted)] uppercase">Frequency</label>
                             
                             {/* ℹ️ INFO TOOLTIP */}
                             {hasExistingPayments && !noActiveCycle && (
@@ -357,7 +358,7 @@ export default function Settings() {
                             value={formData.subscriptionFrequency}
                             onChange={(e) => handleFrequencyChange(e.target.value)}
                             disabled={hasExistingPayments && !noActiveCycle}
-                            className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-xl py-3 px-4 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:bg-slate-50 disabled:text-slate-400 transition-all cursor-pointer disabled:cursor-not-allowed"
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-main)] text-sm rounded-xl py-3 px-4 outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 disabled:bg-slate-50 dark:disabled:bg-slate-800 disabled:text-[var(--text-muted)] transition-all cursor-pointer disabled:cursor-not-allowed"
                         >
                             <option value="weekly">Weekly Collection</option>
                             <option value="monthly">Monthly Collection</option>
@@ -366,7 +367,7 @@ export default function Settings() {
                         
                         {/* Lock Message */}
                         {hasExistingPayments && !noActiveCycle && (
-                            <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1 font-medium">
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 ml-1 flex items-center gap-1 font-medium">
                                 <Lock size={10} /> Locked due to existing records
                             </p>
                         )}
@@ -381,6 +382,7 @@ export default function Settings() {
                                 onChange={(e) => setFormData({ ...formData, amountPerInstallment: e.target.value })}
                                 icon={Coins}
                                 required
+                                className="bg-[var(--bg-input)]"
                             />
                             
                             {formData.subscriptionFrequency === 'weekly' ? (
@@ -390,11 +392,12 @@ export default function Settings() {
                                     value={formData.totalInstallments}
                                     onChange={(e) => setFormData({ ...formData, totalInstallments: e.target.value })}
                                     required
+                                    className="bg-[var(--bg-input)]"
                                 />
                             ) : (
-                                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-center">
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Duration</span>
-                                    <span className="text-sm font-bold text-slate-700">12 Months (Fixed)</span>
+                                <div className="bg-slate-50 dark:bg-slate-800 border border-[var(--border-color)] rounded-xl p-3 flex flex-col justify-center">
+                                    <span className="text-xs font-bold text-[var(--text-muted)] uppercase">Duration</span>
+                                    <span className="text-sm font-bold text-[var(--text-main)]">12 Months (Fixed)</span>
                                 </div>
                             )}
                         </>
@@ -404,17 +407,17 @@ export default function Settings() {
 
             {/* Opening Balance (Only for new year) */}
             {noActiveCycle && (
-                <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
+                <div className="bg-amber-50/50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-100 dark:border-amber-900/30">
                     <Input 
                         type="number"
                         label="Opening Balance (Optional)"
                         value={formData.openingBalance}
                         onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
                         placeholder="0"
-                        className="bg-white"
+                        className="bg-[var(--bg-input)]"
                         icon={Coins}
                     />
-                    <p className="text-xs text-amber-600 mt-1.5 ml-1">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 ml-1">
                         Carry forward funds from the previous year if needed.
                     </p>
                 </div>

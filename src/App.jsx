@@ -1,5 +1,5 @@
-import React, { Suspense } from "react"; // Import Suspense
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense } from "react"; 
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Providers & Components
 import { AuthProvider } from "./context/AuthContext";
@@ -8,9 +8,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import RequireSubscription from "./components/RequireSubscription";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
-import LoadingOverlay from "./loading/LoadingOverlay"; // Import Overlay
+import LoadingOverlay from "./loading/LoadingOverlay";
 
-// Lazy Load Pages for Performance
+// Lazy Load Pages
 const Login = React.lazy(() => import("./pages/Login"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard")); 
 const DashboardHome = React.lazy(() => import("./pages/DashboardHome"));
@@ -29,9 +29,9 @@ const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
 const Archives = React.lazy(() => import("./pages/Archives"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
-// Fallback for Suspense (can use a simple spinner or the skeleton structure)
+// Fallback for Suspense
 const PageLoader = () => (
-  <div className="flex h-screen w-full items-center justify-center">
+  <div className="flex h-screen w-full items-center justify-center bg-[var(--bg-app)]">
     <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" />
   </div>
 );
@@ -67,7 +67,7 @@ export default function App() {
                   <Route path="profile" element={<UserProfile />} />
 
                   {/* AVAILABLE TO EVERYONE */}
-                  <Route path="memebers-contribution" element={<PujaContributions />} />
+                  <Route path="members-Contribution" element={<PujaContributions />} />
                   <Route path="collections" element={<CollectionsOverview />} />
                   <Route path="donations" element={<Donations />} />
                   <Route path="expenses" element={<Expenses />} />

@@ -8,7 +8,6 @@ import {
 import { 
   TrendingUp, TrendingDown, Wallet, IndianRupee, PieChart as PieIcon, Download, Loader2, AlertCircle 
 } from "lucide-react";
-// ✅ IMPORT: Use the Snapshot Export
 import { exportFinancePDF } from "../utils/pdfExport";
 import { clsx } from "clsx"; 
 
@@ -32,7 +31,7 @@ export default function Reports() {
   // Data States
   const [summary, setSummary] = useState({ opening: 0, collected: 0, expenses: 0, closing: 0 });
   const [expenses, setExpenses] = useState([]);
-  const [contributions, setContributions] = useState([]); // Stores breakdown for Chart/PDF
+  const [contributions, setContributions] = useState([]); 
   const [dailyCollection, setDailyCollection] = useState([]);
 
   const COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#8b5cf6", "#ef4444"];
@@ -59,7 +58,7 @@ export default function Reports() {
         api.get("/expenses"),
         api.get("/member-fees"),            
         api.get("/donations"),
-        api.get("/members") // Fetch members to calculate subscriptions
+        api.get("/members") 
       ]);
 
       const expenseData = expRes.data.data || [];
@@ -68,17 +67,13 @@ export default function Reports() {
       const membersList = membersRes.data.data || [];
 
       // 3. Calculate Totals
-      // -- Expenses
       const totalExpenses = expenseData
         .filter(e => e.status === "approved")
         .reduce((sum, e) => sum + parseAmount(e.amount), 0);
 
-      // -- Income Sources
       const totalPuja = pujaData.reduce((sum, p) => sum + parseAmount(p.amount), 0);
       const totalDonations = donationData.reduce((sum, d) => sum + parseAmount(d.amount), 0);
       
-      // -- Calculate Subscriptions (Fetch individual subs in parallel for accuracy)
-      // NOTE: In a production app, use a summary endpoint. Here we map client-side.
       const subPromises = membersList.map(m => 
           api.get(`/subscriptions/member/${m.membershipId || m._id}`).catch(() => ({ data: { data: { subscription: null } } }))
       );
@@ -102,15 +97,12 @@ export default function Reports() {
 
       setExpenses(expenseData);
       
-      // Breakdown for Charts & PDF
       setContributions([
         { name: activeYear.subscriptionFrequency === 'monthly' ? "Monthly Collection" : "Weekly Collection", value: totalSubscriptions },
         { name: "Members Contribution", value: totalPuja },
         { name: "Donations", value: totalDonations },
-      ].filter(c => c.value > 0)); // Only show active sources
+      ].filter(c => c.value > 0)); 
 
-      // Daily Trend (Simple approximation using Puja/Donations dates)
-      // Note: Subscriptions usually don't have a single date list easily accessible here without deep mapping
       const dateMap = {};
       [...pujaData, ...donationData].forEach(item => {
          const date = new Date(item.date || item.createdAt).toLocaleDateString("en-US", { month: 'short', day: 'numeric' });
@@ -131,7 +123,6 @@ export default function Reports() {
     }
   };
 
-  // ✅ EXPORT HANDLER: Uses exportFinancePDF
   const handleExport = () => {
     if (!cycle) return;
     setExporting(true);
@@ -145,7 +136,6 @@ export default function Reports() {
                 { label: "Total Expenses", value: summary.expenses },
                 { label: "Net Balance", value: summary.closing },
             ],
-            // Maps the calculated contributions (including subscriptions) to the PDF table
             contributions: contributions.map(c => ({
                 type: c.name,
                 amount: c.value
@@ -162,12 +152,12 @@ export default function Reports() {
   if (loading) return <div className="h-64 flex justify-center items-center text-primary-600"><Loader2 className="animate-spin w-10 h-10" /></div>;
 
   if (!cycle) return (
-    <div className="p-10 text-center bg-slate-50 rounded-3xl border border-slate-200 mt-10">
-      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+    <div className="p-10 text-center bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] mt-10">
+      <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
         <AlertCircle className="text-slate-400" size={32} />
       </div>
-      <h3 className="text-xl font-bold text-slate-800">No Active Financial Year</h3>
-      <p className="text-slate-500 max-w-sm mx-auto mt-2">Reports will appear here once you start a new festival cycle in Settings.</p>
+      <h3 className="text-xl font-bold text-[var(--text-main)]">No Active Financial Year</h3>
+      <p className="text-[var(--text-muted)] max-w-sm mx-auto mt-2">Reports will appear here once you start a new festival cycle in Settings.</p>
     </div>
   );
 
@@ -177,8 +167,8 @@ export default function Reports() {
       {/* 1. HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Reports</h1>
-          <p className="text-slate-500 text-sm">Overview of <span className="font-bold text-slate-700">{cycle.name}</span></p>
+          <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Financial Reports</h1>
+          <p className="text-[var(--text-muted)] text-sm">Overview of <span className="font-bold text-[var(--text-main)]">{cycle.name}</span></p>
         </div>
         <Button 
           onClick={handleExport}
@@ -214,7 +204,6 @@ export default function Reports() {
           amount={summary.closing} 
           icon={IndianRupee} 
           color="indigo" 
-       
         />
       </div>
 
@@ -223,7 +212,7 @@ export default function Reports() {
         
         {/* A. INCOME VS EXPENSE */}
         <Card className="min-h-[400px]">
-          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <h3 className="font-bold text-[var(--text-main)] mb-6 flex items-center gap-2">
             <TrendingUp size={18} className="text-primary-600"/> Income vs Expense
           </h3>
           <div className="h-[300px]">
@@ -235,12 +224,12 @@ export default function Reports() {
                 ]}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${Number(val)/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-muted)', fontSize: 12}} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${Number(val)/1000}k`} tick={{fill: 'var(--text-muted)', fontSize: 12}} />
                 <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ fill: 'var(--bg-app)' }}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                 />
                 <Bar dataKey="amount" radius={[8, 8, 0, 0]} barSize={50}>
                   <Cell fill="#10b981" />
@@ -253,7 +242,7 @@ export default function Reports() {
 
         {/* B. EXPENSE BREAKDOWN (PIE) */}
         <Card className="min-h-[400px]">
-          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <h3 className="font-bold text-[var(--text-main)] mb-6 flex items-center gap-2">
             <PieIcon size={18} className="text-primary-600"/> Expense Breakdown
           </h3>
           {expenses.length > 0 ? (
@@ -272,18 +261,22 @@ export default function Reports() {
                     outerRadius={100}
                     paddingAngle={5}
                     dataKey="value"
+                    stroke="var(--bg-card)"
                   >
                     {expenses.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(val) => `₹${Number(val).toFixed(2)}`} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                  <Tooltip 
+                    formatter={(val) => `₹${Number(val).toFixed(2)}`} 
+                    contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[300px] flex flex-col items-center justify-center text-slate-400">
-               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+            <div className="h-[300px] flex flex-col items-center justify-center text-[var(--text-muted)]">
+               <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-3">
                   <PieIcon size={24} className="opacity-20"/>
                </div>
                <p className="text-sm font-medium">No expenses recorded yet.</p>
@@ -294,7 +287,7 @@ export default function Reports() {
 
       {/* 4. CHART ROW 2: TRENDS */}
       <Card>
-        <h3 className="font-bold text-slate-800 mb-6">Daily Collection Trend (Last 14 Days)</h3>
+        <h3 className="font-bold text-[var(--text-main)] mb-6">Daily Collection Trend (Last 14 Days)</h3>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={dailyCollection} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -304,10 +297,12 @@ export default function Reports() {
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: 'var(--text-muted)', fontSize: 12}} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--text-muted)', fontSize: 12}} />
+              <Tooltip 
+                contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
+              />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
               <Area 
                 type="monotone" 
                 dataKey="amount" 
@@ -326,23 +321,23 @@ export default function Reports() {
 
 function StatCard({ label, amount, icon: Icon, color, highlight }) {
   const colors = {
-      blue: "bg-blue-50 text-blue-600",
-      emerald: "bg-emerald-50 text-emerald-600",
-      rose: "bg-rose-50 text-rose-600",
-      indigo: "bg-indigo-50 text-indigo-600",
+      blue: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
+      emerald: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
+      rose: "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
+      indigo: "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400",
   };
 
   return (
     <Card className={clsx("transition-all hover:-translate-y-1", highlight && "bg-slate-900 text-white border-slate-900")}>
       <div className="flex justify-between items-start mb-4">
         <div>
-          <p className={clsx("text-xs font-bold uppercase tracking-wider", highlight ? "text-slate-400" : "text-slate-500")}>
+          <p className={clsx("text-xs font-bold uppercase tracking-wider", highlight ? "text-slate-400" : "text-[var(--text-muted)]")}>
             {label}
           </p>
-          <h3 className="text-2xl font-bold font-mono mt-1">₹{Number(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</h3>
+          <h3 className="text-2xl font-bold font-mono mt-1 text-[var(--text-main)]">₹{Number(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</h3>
         </div>
         <div className={clsx("p-3 rounded-xl flex items-center justify-center", !highlight && colors[color], highlight && "bg-slate-800 text-indigo-400")}>
-           <Icon size={20} /> 
+            <Icon size={20} /> 
         </div>
       </div>
     </Card>

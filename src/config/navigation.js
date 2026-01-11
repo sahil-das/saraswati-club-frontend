@@ -1,7 +1,6 @@
-import { path } from "framer-motion/client";
 import { 
-  LayoutDashboard, Users, Wallet, CreditCard, Heart,Sparkles,PieChart,
-  IndianRupee, History, Settings, FileText, Archive, CalendarRange 
+  LayoutDashboard, Users, Wallet, Heart, Sparkles, PieChart,
+  History, Settings, FileText, Archive, CalendarRange 
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -17,7 +16,6 @@ const NAV_ITEMS = [
     icon: Users,
     roles: ["admin", "member"] 
   },
-  /* 👇 ADDED THIS MISSING LINK */
   {
     label: "My Subscriptions",
     path: "/contributions",
@@ -25,8 +23,8 @@ const NAV_ITEMS = [
     roles: ["admin", "member"]
   },
   { 
-    label: "Member's Donaiton", 
-    path: "/memebers-contribution", 
+    label: "Member's Contribution", 
+    path: "/members-contribution", 
     icon: Sparkles,
     roles: ["admin", "member"] 
   },

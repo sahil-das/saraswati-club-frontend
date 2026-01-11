@@ -1,22 +1,35 @@
 @import "tailwindcss";
 
-@theme {
-  /* --- 🎨 THE "TRUST" PALETTE --- */
-  
-  /* Primary Brand (Violet/Indigo - Playful but Serious) */
-  --color-primary-50: #f5f3ff;
-  --color-primary-100: #ede9fe;
-  --color-primary-200: #ddd6fe;
-  --color-primary-300: #c4b5fd;
-  --color-primary-400: #a78bfa;
-  --color-primary-500: #8b5cf6;
-  --color-primary-600: #7c3aed;
-  --color-primary-700: #6d28d9;
-  --color-primary-800: #5b21b6;
-  --color-primary-900: #4c1d95;
-  --color-primary-950: #2e1065;
+/* 1. 🛠 FORCE CLASS-BASED DARK MODE */
+/* This tells Tailwind v4 to apply 'dark:' styles when the '.dark' class is present */
+@variant dark (&:where(.dark, .dark *));
 
-  /* Neutrals (Slate - Cleaner than Gray) */
+/* 2. 🎨 THEME CONFIGURATION */
+@theme {
+  /* --- Map CSS Variables to Tailwind Utilities --- */
+  
+  --color-bg-app: var(--bg-app);
+  --color-bg-card: var(--bg-card);
+  --color-bg-input: var(--bg-input);
+  --color-border-color: var(--border-color);
+  
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+
+  /* --- ✅ UPDATED: Primary Brand Colors (Blue #2563eb) --- */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb; /* <--- Your Brand Color */
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-primary-950: #172554;
+
+  /* --- Neutrals (Slate) --- */
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;
   --color-slate-200: #e2e8f0;
@@ -29,20 +42,20 @@
   --color-slate-900: #0f172a;
   --color-slate-950: #020617;
 
-  /* Semantic Colors */
-  --color-success: #10b981; /* Emerald 500 */
-  --color-danger: #ef4444;  /* Red 500 */
-  --color-warning: #f59e0b; /* Amber 500 */
+  /* --- Semantic Colors --- */
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
 
-  /* --- 📐 SPACING & RADIUS --- */
-  --radius-xl: 1rem;       /* 16px - Standard for Cards */
-  --radius-2xl: 1.5rem;    /* 24px - Modals */
-  --radius-button: 0.75rem; /* 12px - Buttons */
+  /* --- Spacing & Animation --- */
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-button: 0.75rem;
 
-  /* --- ⚡ ANIMATIONS --- */
   --animate-fade-in: fadeIn 0.3s ease-out;
   --animate-slide-up: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-pulse-subtle: pulseSubtle 2s infinite;
+  --animate-shimmer: shimmer 2s infinite;
 
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -56,22 +69,61 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.8; }
   }
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
 }
 
-/* Global Reset & Typography */
+/* 3. 🌓 DEFINE VARIABLE VALUES */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: var(--color-slate-900);
-  background-color: var(--color-slate-50); /* Light blue-grey tint */
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
+  
+  /* Light Mode Values (Slate Based) */
+  --bg-app: #f8fafc;       /* slate-50 */
+  --bg-card: #ffffff;      /* white */
+  --bg-input: #ffffff;     /* white */
+  --border-color: #e2e8f0; /* slate-200 */
+  
+  --text-main: #0f172a;    /* slate-900 */
+  --text-muted: #64748b;   /* slate-500 */
+  
+  --shadow-color: 220 3% 15%;
 }
 
-/* Premium Scrollbar */
+.dark {
+  color-scheme: dark;
+  
+  /* Dark Mode Values (Slate Based) */
+  --bg-app: #020617;       /* slate-950 */
+  --bg-card: #0f172a;      /* slate-900 */
+  --bg-input: #0f172a;     /* slate-900 */
+  --border-color: #1e293b; /* slate-800 */
+  
+  --text-main: #f8fafc;    /* slate-50 */
+  --text-muted: #94a3b8;   /* slate-400 */
+  
+  --shadow-color: 0 0% 0%;
+}
+
+/* 4. 🚀 APPLY GLOBAL DEFAULTS */
+@layer base {
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    font-family: Inter, system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Ensure inputs/buttons inherit text color correctly */
+  h1, h2, h3, h4, h5, h6, input, select, textarea, button {
+    color: inherit;
+  }
+}
+
+/* 5. 🛠 UTILITIES */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -83,11 +135,23 @@
   background: var(--color-slate-300);
   border-radius: 10px;
 }
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-slate-700);
+}
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-slate-400);
 }
 
-/* Remove default focus ring and add our custom one */
+/* Remove default focus ring */
 input:focus, button:focus, select:focus, textarea:focus {
   outline: none;
+}
+
+/* NProgress Bar Override */
+#nprogress .bar {
+  background: var(--color-primary-500) !important;
+  height: 3px !important;
+}
+#nprogress .peg {
+  box-shadow: 0 0 10px var(--color-primary-500), 0 0 5px var(--color-primary-500) !important;
 }

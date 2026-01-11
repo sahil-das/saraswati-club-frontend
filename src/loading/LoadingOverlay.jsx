@@ -12,16 +12,12 @@ export default function LoadingOverlay() {
       role="status"
       aria-busy="true"
     >
-      {/* CHANGES HERE:
-         1. bg-white -> bg-white/80 (80% opacity)
-         2. Added backdrop-blur-md (frosted glass effect)
-      */}
-      <div className="flex flex-col items-center bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl">
+      <div className="flex flex-col items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl border border-white/20 dark:border-slate-700/50">
         
         {/* CUSTOM LOGO ANIMATION */}
         <div className="relative flex items-center justify-center mb-4">
           {/* Outer Ring (Spinner) */}
-          <div className="absolute w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+          <div className="absolute w-16 h-16 border-4 border-primary-100 dark:border-primary-900 border-t-primary-600 dark:border-t-primary-500 rounded-full animate-spin"></div>
           
           {/* Logo in Center */}
           <img 
@@ -31,7 +27,7 @@ export default function LoadingOverlay() {
           />
         </div>
         
-        <p className="text-slate-600 font-bold text-sm tracking-wide">LOADING</p>
+        <p className="text-[var(--text-muted)] font-bold text-sm tracking-wide">LOADING</p>
       </div>
     </div>
   );

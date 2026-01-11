@@ -13,17 +13,10 @@ import { Card } from "../components/ui/Card";
 // 🛠 HELPER: Safe Currency Parser
 const parseAmount = (val) => {
     if (!val) return 0;
-    // If backend returns number (20000), it's Paisa -> Divide
     if (typeof val === 'number') {
-        // Simple heuristic: If it's a huge integer, assume Paisa.
-        // Or better: Assuming your Finance Context sends raw paisa for totals
-        // You might need to check how FinanceContext calculates these.
-        // If FinanceContext sums up strings "50.00", this logic changes.
-        
-        // Safest approach if you are seeing 20000:
+        // Assuming backend returns Paisa for integers
         return val / 100;
     }
-    // If backend returns string "200.00", it's Rupees -> Parse
     return Number(val) || 0;
 };
 
@@ -51,7 +44,6 @@ export default function CollectionsOverview() {
     loadDonations();
   }, []);
 
-  // 🚨 FIX: Parse all inputs before summing
   const parsedOpening = parseAmount(openingBalance);
   const parsedWeekly = parseAmount(weeklyTotal);
   const parsedPuja = parseAmount(pujaTotal);
@@ -100,10 +92,10 @@ export default function CollectionsOverview() {
       {/* 1. HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-             <IndianRupee className="text-primary-600" /> Financial Overview
+           <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight flex items-center gap-2">
+             <IndianRupee className="text-primary-600 dark:text-primary-400" /> Financial Overview
            </h1>
-           <p className="text-slate-500 text-sm mt-1">Real-time breakdown of all club funds.</p>
+           <p className="text-[var(--text-muted)] text-sm mt-1">Real-time breakdown of all club funds.</p>
         </div>
       </div>
 
@@ -118,28 +110,28 @@ export default function CollectionsOverview() {
         />
         <SummaryCard 
           label="Weekly collection" 
-          value={parsedWeekly} // 🚨 FIX: Pass parsed value
+          value={parsedWeekly}
           loading={financeLoading}
           color="blue"
           icon={Calendar}
         />
         <SummaryCard 
           label="Festival collection" 
-          value={parsedPuja} // 🚨 FIX: Pass parsed value
+          value={parsedPuja}
           loading={financeLoading}
           color="pink"
           icon={IndianRupee}
         />
         <SummaryCard 
           label="Donations" 
-          value={parsedDonation} // 🚨 FIX: Pass parsed value
+          value={parsedDonation}
           loading={financeLoading}
           color="amber"
           icon={TrendingUp}
         />
         <SummaryCard
           label="Grand Total"
-          value={totalCollection} // 🚨 FIX: Pass parsed value
+          value={totalCollection}
           loading={financeLoading}
           highlight
           icon={ArrowUpRight}
@@ -152,7 +144,7 @@ export default function CollectionsOverview() {
         {/* Main Timeline */}
         <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-800 text-lg">Transaction History</h3>
+                <h3 className="font-bold text-[var(--text-main)] text-lg">Transaction History</h3>
                 
                 {/* Search Pill */}
                 <div className="relative group">
@@ -160,7 +152,7 @@ export default function CollectionsOverview() {
                     <input 
                         type="text" 
                         placeholder="Search records..." 
-                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-full text-sm focus:ring-2 focus:ring-primary-100 outline-none w-32 focus:w-64 transition-all shadow-sm"
+                        className="pl-9 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-full text-sm text-[var(--text-main)] focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/30 outline-none w-32 focus:w-64 transition-all shadow-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -169,14 +161,14 @@ export default function CollectionsOverview() {
 
             {/* Empty State */}
             {!loading && Object.keys(groupedData).length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 bg-white border border-slate-100 rounded-2xl border-dashed">
-                    <Filter className="text-slate-200 mb-2" size={48} />
-                    <p className="text-slate-400 font-medium">No transactions found</p>
+                <div className="flex flex-col items-center justify-center py-16 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl border-dashed">
+                    <Filter className="text-[var(--text-muted)] opacity-50 mb-2" size={48} />
+                    <p className="text-[var(--text-muted)] font-medium">No transactions found</p>
                 </div>
             )}
 
             {/* Timeline Stream */}
-            <div className="relative border-l-2 border-slate-200 ml-2 md:ml-4 space-y-6 pb-4">
+            <div className="relative border-l-2 border-slate-200 dark:border-slate-800 ml-2 md:ml-4 space-y-6 pb-4">
                 {Object.entries(groupedData).map(([date, items], index) => {
                     const isOpen = openDates[date];
                     
@@ -189,8 +181,8 @@ export default function CollectionsOverview() {
                                 className={clsx(
                                     "absolute -left-[9px] top-1 w-5 h-5 rounded-full border-4 flex items-center justify-center transition-all z-10",
                                     isOpen 
-                                        ? "bg-white border-primary-500 ring-2 ring-primary-100 scale-110" 
-                                        : "bg-slate-200 border-slate-50 hover:bg-primary-200 hover:border-primary-300"
+                                        ? "bg-[var(--bg-card)] border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900 scale-110" 
+                                        : "bg-slate-200 dark:bg-slate-700 border-slate-50 dark:border-slate-800 hover:bg-primary-200 dark:hover:bg-primary-800 hover:border-primary-300 dark:hover:border-primary-700"
                                 )}
                             >
                                 {/* Small dot inside */}
@@ -200,11 +192,11 @@ export default function CollectionsOverview() {
                             {/* Date Header (Clickable) */}
                             <button 
                                 onClick={() => toggleDate(date)}
-                                className="w-full flex items-center justify-between group mb-3 hover:bg-slate-50 p-2 rounded-lg -ml-2 transition-colors"
+                                className="w-full flex items-center justify-between group mb-3 hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg -ml-2 transition-colors"
                             >
                                 <div className="flex items-baseline gap-3">
-                                    <h4 className="font-bold text-slate-700 text-lg">{date.split(" ")[0]} <span className="text-sm font-normal text-slate-500">{date.split(" ").slice(1).join(" ")}</span></h4>
-                                    <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                                    <h4 className="font-bold text-[var(--text-main)] text-lg">{date.split(" ")[0]} <span className="text-sm font-normal text-[var(--text-muted)]">{date.split(" ").slice(1).join(" ")}</span></h4>
+                                    <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)] px-2 py-0.5 rounded-full">
                                         {items.length} txn
                                     </span>
                                 </div>
@@ -217,24 +209,23 @@ export default function CollectionsOverview() {
                             {isOpen && (
                                 <div className="space-y-3 animate-fade-in">
                                     {items.map((d) => (
-                                        <div key={d._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center group">
+                                        <div key={d._id} className="bg-[var(--bg-card)] p-4 rounded-xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition-shadow flex justify-between items-center group">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                                <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
                                                     {d.donorName ? d.donorName.charAt(0) : "?"}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-bold text-slate-800 text-sm group-hover:text-primary-700 transition-colors truncate">
+                                                    <p className="font-bold text-[var(--text-main)] text-sm group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors truncate">
                                                         {d.donorName || "Anonymous"}
                                                     </p>
-                                                    <p className="text-xs text-slate-400 capitalize truncate">
+                                                    <p className="text-xs text-[var(--text-muted)] capitalize truncate">
                                                         {d.paymentMethod || "Cash"} {d.receiptNo && `• Ref: ${d.receiptNo}`}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right shrink-0 ml-2">
-                                                {/* 🚨 FIX: Parse amount before display */}
-                                                <p className="font-bold text-slate-800 text-sm">+ ₹{Number(d.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
-                                                <p className="text-[10px] text-slate-400">Donation</p>
+                                                <p className="font-bold text-[var(--text-main)] text-sm">+ ₹{Number(d.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                                                <p className="text-[10px] text-[var(--text-muted)]">Donation</p>
                                             </div>
                                         </div>
                                     ))}
@@ -248,7 +239,7 @@ export default function CollectionsOverview() {
 
         {/* Info Sidebar */}
         <div className="hidden lg:block space-y-6">
-            <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
+            <Card className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-black dark:to-slate-900 text-white border-none shadow-xl">
                 <h3 className="font-bold text-lg mb-2">Fund Distribution</h3>
                 <p className="text-slate-400 text-sm mb-6">How current funds are allocated across categories.</p>
                 
@@ -270,10 +261,10 @@ export default function CollectionsOverview() {
 
 function SummaryCard({ label, value, loading, highlight, color, icon: Icon }) {
     const colors = {
-        blue: "bg-blue-50 text-blue-700 border-blue-100",
-        pink: "bg-pink-50 text-pink-700 border-pink-100",
-        amber: "bg-amber-50 text-amber-700 border-amber-100",
-        green: "bg-green-50 text-green-700 border-green-100",
+        blue: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/30",
+        pink: "bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400 border-pink-100 dark:border-pink-900/30",
+        amber: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/30",
+        green: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900/30",
     };
 
     return (
@@ -281,7 +272,7 @@ function SummaryCard({ label, value, loading, highlight, color, icon: Icon }) {
         className={clsx(
             "rounded-2xl p-5 flex flex-col justify-between border min-h-[110px] transition-all hover:-translate-y-1",
             highlight 
-                ? "bg-primary-600 text-white border-primary-600 shadow-xl shadow-primary-200" 
+                ? "bg-primary-600 text-white border-primary-600 shadow-xl shadow-primary-200 dark:shadow-none" 
                 : `${colors[color]} shadow-sm`
         )}
       >
@@ -296,7 +287,6 @@ function SummaryCard({ label, value, loading, highlight, color, icon: Icon }) {
            <div className="h-8 w-24 bg-current opacity-20 rounded animate-pulse" />
         ) : (
            <h3 className="text-3xl font-bold font-mono tracking-tight">
-             {/* 🚨 FIX: Ensure value is parsed before display */}
              ₹{(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
            </h3>
         )}
@@ -313,7 +303,7 @@ function DistributionBar({ label, amount, total, color }) {
                 <span className="text-slate-300">{label}</span>
                 <span>{percentage}%</span>
             </div>
-            <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-slate-700 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${percentage}%` }} />
             </div>
         </div>

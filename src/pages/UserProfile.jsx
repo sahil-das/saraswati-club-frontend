@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../context/ToastContext"; // 👈 Toast
+import { useToast } from "../context/ToastContext"; 
 import { getProfile, updateProfile, changePassword, getMyStats } from "../api/User"; 
 import { 
   IndianRupee, Wallet, Calendar, User, Mail, Phone, Lock, 
-  Camera, Edit3, AtSign, Save, X, Eye, EyeOff
+  Edit3, AtSign, Save, Eye, EyeOff
 } from "lucide-react";
-import { Button } from "../components/ui/Button"; // 👈 UI Component
+import { Button } from "../components/ui/Button"; 
 
 export default function UserProfile() {
   const { user: authUser, setUser: setGlobalUser } = useAuth(); 
@@ -83,62 +83,22 @@ export default function UserProfile() {
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
       toast.success("Password changed successfully");
     } catch (error) {
-      // Network / no response
       if (!error.response) {
-        console.error("Password update network error:", error);
-        toast.error("Network error: please check your connection and try again");
+        toast.error("Network error: please check your connection");
         return;
       }
-
       const { status, data } = error.response;
-
-      // Unauthorized - likely wrong current password
       if (status === 401) {
         toast.error(data?.message || "Current password is incorrect");
         return;
       }
-
-      // Bad Request - validation errors
-      if (status === 400) {
-        // Handle different shapes: { message }, { errors: { field: [msg] } }, or { errors: [msg] }
-        if (data?.errors) {
-          const msgs = [];
-          if (Array.isArray(data.errors)) {
-            data.errors.forEach((it) => {
-              if (typeof it === 'string') msgs.push(it);
-              else if (it?.msg) msgs.push(it.msg);
-            });
-          } else if (typeof data.errors === 'object') {
-            Object.values(data.errors).forEach((v) => {
-              if (Array.isArray(v)) msgs.push(...v.map(item => (typeof item === 'string' ? item : item?.msg || JSON.stringify(item))));
-              else if (typeof v === 'string') msgs.push(v);
-            });
-          }
-
-          const final = msgs.filter(Boolean).join(' • ');
-          toast.error(final || data?.message || 'Invalid password input');
-          return;
-        }
-
-        toast.error(data?.message || 'Invalid password input');
-        return;
-      }
-
-      // Server errors
-      if (status >= 500) {
-        console.error('Server error changing password:', data || error);
-        toast.error('Server error. Please try again later.');
-        return;
-      }
-
-      // Fallback
       toast.error(data?.message || 'Password update failed');
     }
   };
 
   if (loading) return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+    <div className="min-h-[60vh] flex items-center justify-center text-primary-600">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-current"></div>
     </div>
   );
 
@@ -147,37 +107,37 @@ export default function UserProfile() {
       
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Account Settings</h1>
-        <p className="text-slate-500 text-sm">Manage your personal details and security.</p>
+        <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Account Settings</h1>
+        <p className="text-[var(--text-muted)] text-sm">Manage your personal details and security.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* LEFT COLUMN: PROFILE CARD */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative group">
-            <div className="h-32 bg-gradient-to-r from-indigo-600 to-violet-600 relative">
+          <div className="bg-[var(--bg-card)] rounded-2xl shadow-sm border border-[var(--border-color)] overflow-hidden relative group">
+            <div className="h-32 bg-gradient-to-r from-primary-600 to-indigo-800 relative">
                <div className="absolute inset-0 bg-black/10"></div>
             </div>
             
             <div className="px-6 relative">
               <div className="-mt-12 mb-3 inline-block relative">
-                <div className="h-24 w-24 rounded-full border-4 border-white bg-white shadow-md flex items-center justify-center overflow-hidden">
-                   <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600 text-3xl font-bold">
+                <div className="h-24 w-24 rounded-full border-4 border-[var(--bg-card)] bg-[var(--bg-card)] shadow-md flex items-center justify-center overflow-hidden">
+                   <div className="w-full h-full bg-primary-50 dark:bg-primary-900/50 flex items-center justify-center text-primary-600 dark:text-primary-400 text-3xl font-bold">
                       {user?.name?.charAt(0).toUpperCase()}
                    </div>
                 </div>
               </div>
 
               <div className="pb-6">
-                <h2 className="text-xl font-bold text-slate-900">{user?.name}</h2>
-                <p className="text-sm text-slate-500 mb-4">{user?.email}</p>
+                <h2 className="text-xl font-bold text-[var(--text-main)]">{user?.name}</h2>
+                <p className="text-sm text-[var(--text-muted)] mb-4">{user?.email}</p>
                 
                 <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wide">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-100 dark:border-primary-900/30 uppercase tracking-wide">
                     {user?.role || "Member"}
                   </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 uppercase tracking-wide">
                     Active
                   </span>
                 </div>
@@ -186,28 +146,28 @@ export default function UserProfile() {
           </div>
 
           {/* Quick Stats Summary */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Current Cycle</h3>
-             <div className="space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                   <span className="text-slate-500">Festival Fee</span>
-                   <span className="font-bold text-slate-900 font-mono">₹{stats?.festivalChandaTotal || 0}</span>
-                </div>
-                {stats?.frequency !== 'none' && (
-                  <div className="flex justify-between items-center text-sm">
-                     <span className="text-slate-500">
-                       {stats?.frequency === 'weekly' ? 'Weekly Contribution' : stats?.frequency === 'monthly' ? 'Monthly Contribution' : 'Subscription Paid'}
-                     </span>
-                     <span className="font-bold text-emerald-600 font-mono">₹{stats?.totalPaid || 0}</span>
-                  </div>
-                )}
-                {stats?.frequency !== 'none' && (
-                  <div className="pt-3 border-t border-slate-50 flex justify-between items-center text-sm">
-                     <span className="text-slate-500">Pending Dues</span>
-                     <span className="font-bold text-rose-600 font-mono">₹{stats?.totalDue || 0}</span>
-                  </div>
-                )}
-             </div>
+          <div className="bg-[var(--bg-card)] rounded-2xl shadow-sm border border-[var(--border-color)] p-6">
+              <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-4">Current Cycle</h3>
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center text-sm">
+                    <span className="text-[var(--text-muted)]">Festival Fee</span>
+                    <span className="font-bold text-[var(--text-main)] font-mono">₹{stats?.festivalChandaTotal || 0}</span>
+                 </div>
+                 {stats?.frequency !== 'none' && (
+                   <div className="flex justify-between items-center text-sm">
+                      <span className="text-[var(--text-muted)]">
+                        {stats?.frequency === 'weekly' ? 'Weekly Contribution' : stats?.frequency === 'monthly' ? 'Monthly Contribution' : 'Subscription Paid'}
+                      </span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">₹{stats?.totalPaid || 0}</span>
+                   </div>
+                 )}
+                 {stats?.frequency !== 'none' && (
+                   <div className="pt-3 border-t border-[var(--border-color)] flex justify-between items-center text-sm">
+                      <span className="text-[var(--text-muted)]">Pending Dues</span>
+                      <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">₹{stats?.totalDue || 0}</span>
+                   </div>
+                 )}
+              </div>
           </div>
         </div>
 
@@ -215,15 +175,15 @@ export default function UserProfile() {
         <div className="lg:col-span-8">
           
           {/* Tabs */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6 inline-flex w-full md:w-auto">
+          <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-color)] p-1 mb-6 inline-flex w-full md:w-auto">
             {['overview', 'settings', 'security'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-bold rounded-lg transition-all capitalize ${
                   activeTab === tab 
-                  ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' 
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 shadow-sm ring-1 ring-primary-200 dark:ring-primary-800' 
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
                 {tab}
@@ -234,34 +194,34 @@ export default function UserProfile() {
           {/* TAB: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><IndianRupee size={24} /></div>
+              <div className="bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-start gap-4">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl"><IndianRupee size={24} /></div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase">Festival Contribution</p>
-                  <h3 className="text-2xl font-bold text-slate-900 mt-1 font-mono">₹{stats?.festivalChandaTotal || 0}</h3>
+                  <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Festival Contribution</p>
+                  <h3 className="text-2xl font-bold text-[var(--text-main)] mt-1 font-mono">₹{stats?.festivalChandaTotal || 0}</h3>
                 </div>
               </div>
               {stats?.frequency !== 'none' && (
                 <>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Wallet size={24} /></div>
+                  <div className="bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-start gap-4">
+                    <div className="p-3 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-xl"><Wallet size={24} /></div>
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase">
+                      <p className="text-xs font-bold text-[var(--text-muted)] uppercase">
                         {stats?.frequency === 'weekly' ? 'Weekly Contribution' : stats?.frequency === 'monthly' ? 'Monthly Contribution' : 'Subscription Paid'}
                       </p>
-                      <h3 className="text-2xl font-bold text-slate-900 mt-1 font-mono">₹{stats?.totalPaid || 0}</h3>
+                      <h3 className="text-2xl font-bold text-[var(--text-main)] mt-1 font-mono">₹{stats?.totalPaid || 0}</h3>
                     </div>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4 md:col-span-2">
-                    <div className={`p-3 rounded-xl ${stats?.totalDue > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}>
+                  <div className="bg-[var(--bg-card)] p-6 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-start gap-4 md:col-span-2">
+                    <div className={`p-3 rounded-xl ${stats?.totalDue > 0 ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'}`}>
                       <Calendar size={24} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase">Pending Dues</p>
-                      <h3 className={`text-2xl font-bold mt-1 font-mono ${stats?.totalDue > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                      <p className="text-xs font-bold text-[var(--text-muted)] uppercase">Pending Dues</p>
+                      <h3 className={`text-2xl font-bold mt-1 font-mono ${stats?.totalDue > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
                         ₹{stats?.totalDue || 0}
                       </h3>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
                         {stats?.totalDue > 0 ? "Please clear your dues soon." : "You are all caught up!"}
                       </p>
                     </div>
@@ -273,15 +233,15 @@ export default function UserProfile() {
 
           {/* TAB: SETTINGS */}
           {activeTab === 'settings' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 animate-in fade-in">
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] shadow-sm p-6 animate-in fade-in">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-lg text-slate-800">Personal Info</h3>
+                <h3 className="font-bold text-lg text-[var(--text-main)]">Personal Info</h3>
                 {!isEditing ? (
                   <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)} leftIcon={<Edit3 size={16}/>}>
                     Edit Profile
                   </Button>
                 ) : (
-                  <span className="text-xs font-bold bg-amber-50 text-amber-600 px-3 py-1 rounded-full border border-amber-100">
+                  <span className="text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-100 dark:border-amber-900/30">
                     Editing Mode
                   </span>
                 )}
@@ -290,59 +250,59 @@ export default function UserProfile() {
               <form onSubmit={handleInfoUpdate} className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase">Full Name</label>
                     <div className="relative">
                       <User size={18} className="absolute left-3 top-3 text-slate-400"/>
                       <input 
                         disabled={!isEditing}
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:opacity-60"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Phone</label>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase">Phone</label>
                     <div className="relative">
                       <Phone size={18} className="absolute left-3 top-3 text-slate-400"/>
                       <input 
                         disabled={!isEditing}
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:opacity-60"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
 
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Personal Email</label>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase">Personal Email</label>
                     <div className="relative">
                       <Mail size={18} className="absolute left-3 top-3 text-slate-400"/>
                       <input 
                         disabled={!isEditing}
                         value={formData.personalEmail}
                         onChange={(e) => setFormData({...formData, personalEmail: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:opacity-60"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
 
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase">System ID</label>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase">System ID</label>
                     <div className="relative">
                       <AtSign size={18} className="absolute left-3 top-3 text-slate-400"/>
                       <input 
                         disabled
                         value={user?.email || ""}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-100 bg-slate-100 text-slate-400 cursor-not-allowed"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-slate-100 dark:bg-slate-800 text-[var(--text-muted)] cursor-not-allowed"
                       />
                     </div>
                   </div>
                 </div>
 
                 {isEditing && (
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-50">
+                  <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                     <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
                     <Button type="submit" leftIcon={<Save size={18}/>}>Save Changes</Button>
                   </div>
@@ -353,71 +313,68 @@ export default function UserProfile() {
 
           {/* TAB: SECURITY */}
           {activeTab === 'security' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 animate-in fade-in">
-               <h3 className="font-bold text-lg text-slate-800 mb-6">Change Password</h3>
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] shadow-sm p-6 animate-in fade-in">
+               <h3 className="font-bold text-lg text-[var(--text-main)] mb-6">Change Password</h3>
                <form onSubmit={handlePasswordUpdate} className="max-w-lg space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Current Password</label>
-                    <div className="relative">
-                      <input 
-                        type={showCurrent ? "text" : "password"} required
-                        value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCurrent(s => !s)}
-                        className="absolute right-2 top-2.5 text-slate-400 p-1"
-                        aria-label={showCurrent ? "Hide current password" : "Show current password"}
-                      >
-                        {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">New Password</label>
-                      <div className="relative">
-                        <input 
-                          type={showNew ? "text" : "password"} required
-                          value={passwordData.newPassword}
-                          onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNew(s => !s)}
-                          className="absolute right-2 top-2.5 text-slate-400 p-1"
-                          aria-label={showNew ? "Hide new password" : "Show new password"}
-                        >
-                          {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Confirm</label>
-                      <div className="relative">
-                        <input 
-                          type={showConfirm ? "text" : "password"} required
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirm(s => !s)}
-                          className="absolute right-2 top-2.5 text-slate-400 p-1"
-                          aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
-                        >
-                          {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <Button type="submit" variant="secondary">Update Password</Button>
-                  </div>
+                 <div>
+                   <label className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1 block">Current Password</label>
+                   <div className="relative">
+                     <input 
+                       type={showCurrent ? "text" : "password"} required
+                       value={passwordData.currentPassword}
+                       onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                       className="w-full px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none pr-10 transition-all"
+                     />
+                     <button
+                       type="button"
+                       onClick={() => setShowCurrent(s => !s)}
+                       className="absolute right-2 top-2.5 text-slate-400 p-1"
+                     >
+                       {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
+                     </button>
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1 block">New Password</label>
+                     <div className="relative">
+                       <input 
+                         type={showNew ? "text" : "password"} required
+                         value={passwordData.newPassword}
+                         onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                         className="w-full px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none pr-10 transition-all"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => setShowNew(s => !s)}
+                         className="absolute right-2 top-2.5 text-slate-400 p-1"
+                       >
+                         {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+                       </button>
+                     </div>
+                   </div>
+                   <div>
+                     <label className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1 block">Confirm</label>
+                     <div className="relative">
+                       <input 
+                         type={showConfirm ? "text" : "password"} required
+                         value={passwordData.confirmPassword}
+                         onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                         className="w-full px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none pr-10 transition-all"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => setShowConfirm(s => !s)}
+                         className="absolute right-2 top-2.5 text-slate-400 p-1"
+                       >
+                         {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+                 <div className="flex justify-end pt-2">
+                   <Button type="submit" variant="secondary">Update Password</Button>
+                 </div>
                </form>
             </div>
           )}

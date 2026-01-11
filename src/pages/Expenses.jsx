@@ -9,7 +9,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { 
   Plus, Search, CheckCircle, XCircle, Clock, Loader2, Download, Trash2,
-  FileText, Calendar, Filter, ChevronDown, Lock, PlusCircle, AlertCircle
+  FileText, Calendar, Filter, ChevronDown, Lock, PlusCircle
 } from "lucide-react";
 
 // Design System & Components
@@ -18,9 +18,10 @@ import { Card } from "../components/ui/Card";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 import AddExpenseModal from "../components/AddExpenseModal"; 
-import CreateYearModal from "../components/CreateYearModal"; // 👈 Import Create Year Modal
+import CreateYearModal from "../components/CreateYearModal"; 
 import { exportExpensesPDF } from "../utils/pdfExport"; 
 import { fetchActiveYear } from "../api/years";
+
 const CATEGORIES = ["Pandal", "Idol", "Light & Sound", "Food/Bhog", "Priest/Puja", "Transport", "Miscellaneous"];
 
 export default function Expenses() {
@@ -30,7 +31,7 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showCreateYear, setShowCreateYear] = useState(false); // 👈 State for Create Year
+  const [showCreateYear, setShowCreateYear] = useState(false); 
   const [searchTerm, setSearchTerm] = useState("");
   const [cycle, setCycle] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -41,17 +42,13 @@ export default function Expenses() {
     try {
       setLoading(true);
 
-      console
       // 1. CHECK ACTIVE YEAR FIRST
       let activeYear = null;
       try {
-          console.log("Fetching active year...");
           const yearRes = await fetchActiveYear();
           activeYear = yearRes.data.data;
-          console.log("Active Year:", activeYear);
       } catch (e) {
           activeYear = null;
-          console.error("Error fetching active year:", e);
       }
       
       setCycle(activeYear);
@@ -122,25 +119,24 @@ export default function Expenses() {
     .filter(e => e.status === "approved")
     .reduce((sum, e) => sum + Number(e.amount), 0);
 
-  if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-indigo-600"><Loader2 className="animate-spin w-10 h-10"/></div>;
+  if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-primary-600"><Loader2 className="animate-spin w-10 h-10"/></div>;
 
   // 🔒 CLOSED YEAR STATE
   if (!cycle) {
       if (activeClub?.role === 'admin') {
           return (
-              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 animate-in fade-in">
-                  <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
-                      <PlusCircle size={32} className="text-indigo-500" />
+              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-[var(--bg-card)] rounded-[2.5rem] border border-dashed border-[var(--border-color)] animate-in fade-in">
+                  <div className="w-20 h-20 bg-[var(--bg-card)] rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100 dark:ring-slate-800">
+                      <PlusCircle size={32} className="text-primary-500" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800">No Active Budget</h2>
-                  <p className="text-slate-500 max-w-md mt-3 mb-8 leading-relaxed">
+                  <h2 className="text-2xl font-bold text-[var(--text-main)]">No Active Budget</h2>
+                  <p className="text-[var(--text-muted)] max-w-md mt-3 mb-8 leading-relaxed">
                       You need to start a new financial year to record and manage expenses.
                   </p>
-                  <Button onClick={() => setShowCreateYear(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200">
+                  <Button onClick={() => setShowCreateYear(true)} className="bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-200 dark:shadow-none">
                       <PlusCircle size={18} className="mr-2" /> Start New Year
                   </Button>
                   
-                  {/* Reuse the Create Year Modal */}
                   {showCreateYear && (
                     <CreateYearModal 
                         onSuccess={() => { setShowCreateYear(false); loadExpenses(); }} 
@@ -151,12 +147,12 @@ export default function Expenses() {
           );
       }
       return (
-          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[2.5rem] border border-slate-200 animate-in fade-in">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100">
+          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6 bg-[var(--bg-card)] rounded-[2.5rem] border border-[var(--border-color)] animate-in fade-in">
+              <div className="w-20 h-20 bg-[var(--bg-card)] rounded-full flex items-center justify-center shadow-md mb-6 ring-4 ring-slate-100 dark:ring-slate-800">
                   <Lock size={32} className="text-slate-400" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-700">Expenses Locked</h2>
-              <p className="text-slate-500 max-w-md mt-2">
+              <h2 className="text-2xl font-bold text-[var(--text-main)]">Expenses Locked</h2>
+              <p className="text-[var(--text-muted)] max-w-md mt-2">
                   Expenses cannot be viewed or added until the new financial year begins.
               </p>
           </div>
@@ -171,12 +167,12 @@ export default function Expenses() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
            <div className="flex items-center gap-3">
-             <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl">
+             <div className="p-2.5 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-xl">
                 <FileText size={24} />
              </div>
              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Expenses</h1>
-                <p className="text-slate-500 text-sm font-medium">
+                <h1 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">Expenses</h1>
+                <p className="text-[var(--text-muted)] text-sm font-medium">
                   {cycle.name} Cycle
                 </p>
              </div>
@@ -184,15 +180,15 @@ export default function Expenses() {
         </div>
         
         <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm sm:border-none sm:shadow-none sm:bg-transparent sm:text-right flex justify-between sm:block items-center">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Approved</p>
-                <p className="text-lg sm:text-2xl font-bold font-mono text-slate-700">₹{totalApproved.toLocaleString()}</p>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl shadow-sm sm:border-none sm:shadow-none sm:bg-transparent sm:text-right flex justify-between sm:block items-center">
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Total Approved</p>
+                <p className="text-lg sm:text-2xl font-bold font-mono text-[var(--text-main)]">₹{totalApproved.toLocaleString()}</p>
             </div>
             
             <Button 
                 onClick={() => setShowAddModal(true)}
                 leftIcon={<Plus size={18} />}
-                className="shadow-lg shadow-indigo-200"
+                className="shadow-lg shadow-primary-200 dark:shadow-none"
             >
                 Add Bill
             </Button>
@@ -200,14 +196,14 @@ export default function Expenses() {
       </div>
 
       {/* 2. TOOLBAR */}
-      <Card noPadding className="shadow-sm border-slate-200">
+      <Card noPadding className="shadow-sm border-[var(--border-color)]">
         <div className="p-3 md:p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
                 <input 
                     type="text" 
                     placeholder="Search expenses..." 
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-main)] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -216,7 +212,7 @@ export default function Expenses() {
             <div className="flex gap-3 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-40">
                     <select 
-                        className="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-xl pl-3 pr-8 py-2 focus:border-indigo-500 outline-none cursor-pointer appearance-none font-medium"
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-main)] text-sm rounded-xl pl-3 pr-8 py-2 focus:border-primary-500 outline-none cursor-pointer appearance-none font-medium"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
@@ -230,7 +226,7 @@ export default function Expenses() {
 
                 <Button 
                     variant="secondary" 
-                    className="shrink-0 px-3 border-slate-200 hover:border-indigo-200 hover:text-indigo-600"
+                    className="shrink-0 px-3 border-[var(--border-color)] hover:border-primary-200 hover:text-primary-600 dark:hover:text-primary-400"
                     onClick={() => exportExpensesPDF({ 
                         clubName: activeClub?.clubName, 
                         cycleName: cycle?.name, 
@@ -244,17 +240,17 @@ export default function Expenses() {
       </Card>
 
       {/* 3. EXPENSE LIST */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm min-h-[400px]">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm min-h-[400px]">
          {filteredExpenses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                <div className="bg-slate-50 p-4 rounded-full mb-3">
+            <div className="flex flex-col items-center justify-center h-64 text-[var(--text-muted)]">
+                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full mb-3">
                     <Filter size={32} className="opacity-50"/>
                 </div>
                 <p className="text-sm font-medium">No expenses match your filters</p>
             </div>
          ) : (
             <div className="w-full">
-                <div className="hidden md:grid grid-cols-12 bg-slate-50/80 p-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <div className="hidden md:grid grid-cols-12 bg-slate-50/80 dark:bg-slate-800/80 p-4 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border-color)]">
                     <div className="col-span-4 pl-2">Details</div>
                     <div className="col-span-2">Category</div>
                     <div className="col-span-2">Amount</div>
@@ -262,53 +258,53 @@ export default function Expenses() {
                     <div className="col-span-2 text-right">Actions</div>
                 </div>
 
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-[var(--border-color)]">
                     {filteredExpenses.map((e) => (
-                        <div key={e._id} className="group p-4 flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-0 items-start md:items-center hover:bg-slate-50/50 transition-colors">
+                        <div key={e._id} className="group p-4 flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-0 items-start md:items-center hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                             <div className="col-span-4 pl-2 w-full relative">
                                 <div className="flex justify-between md:block items-start">
                                     <div>
-                                        <h3 className="font-bold text-slate-800 text-sm md:text-sm lg:text-base">{e.title}</h3>
-                                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                        <h3 className="font-bold text-[var(--text-main)] text-sm md:text-sm lg:text-base">{e.title}</h3>
+                                        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-1">
                                             <Calendar size={12} />
                                             {new Date(e.date).toLocaleDateString()}
                                             <span className="hidden md:inline">• By {e.recordedBy?.name || "Member"}</span>
                                         </div>
                                     </div>
-                                    <span className="md:hidden font-mono font-bold text-slate-800 text-base">
+                                    <span className="md:hidden font-mono font-bold text-[var(--text-main)] text-base">
                                         ₹{e.amount.toLocaleString()}
                                     </span>
                                 </div>
                             </div>
                             <div className="hidden md:block col-span-2">
-                                <span className="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg border border-slate-200">
+                                <span className="text-xs font-medium px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-700">
                                     {e.category}
                                 </span>
                             </div>
                             <div className="hidden md:block col-span-2">
-                                <span className="font-mono font-bold text-slate-700">₹{e.amount.toLocaleString()}</span>
+                                <span className="font-mono font-bold text-[var(--text-main)]">₹{e.amount.toLocaleString()}</span>
                             </div>
                             <div className="col-span-2 w-full md:w-auto flex md:justify-center justify-between items-center">
-                                <span className="md:hidden text-xs font-medium text-slate-400">Status</span>
+                                <span className="md:hidden text-xs font-medium text-[var(--text-muted)]">Status</span>
                                 <StatusBadge status={e.status} />
                             </div>
-                            <div className="col-span-2 w-full flex justify-end items-center gap-2 mt-2 md:mt-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50">
+                            <div className="col-span-2 w-full flex justify-end items-center gap-2 mt-2 md:mt-0 pt-2 md:pt-0 border-t md:border-t-0 border-[var(--border-color)]">
                                 {activeClub?.role === "admin" && (
                                     <>
                                         {e.status === "pending" && (
-                                            <div className="flex bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm mr-2">
-                                                <button onClick={() => handleStatus(e._id, "approved")} className="p-1.5 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition" title="Approve">
+                                            <div className="flex bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm mr-2">
+                                                <button onClick={() => handleStatus(e._id, "approved")} className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition" title="Approve">
                                                     <CheckCircle size={18} />
                                                 </button>
-                                                <div className="w-px bg-slate-200"></div>
-                                                <button onClick={() => handleStatus(e._id, "rejected")} className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 transition" title="Reject">
+                                                <div className="w-px bg-[var(--border-color)]"></div>
+                                                <button onClick={() => handleStatus(e._id, "rejected")} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition" title="Reject">
                                                     <XCircle size={18} />
                                                 </button>
                                             </div>
                                         )}
                                         <button 
                                             onClick={() => confirmDeletion(e._id)}
-                                            className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                            className="p-2 text-[var(--text-muted)] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                                             aria-label="Delete Expense"
                                         >
                                             <Trash2 size={16} />
@@ -347,9 +343,9 @@ export default function Expenses() {
 // Subcomponent: Status Badge
 function StatusBadge({ status }) {
     const styles = {
-        pending: "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500/20",
-        approved: "bg-emerald-50 text-emerald-700 border-emerald-100 ring-emerald-500/20",
-        rejected: "bg-red-50 text-red-700 border-red-100 ring-red-500/20"
+        pending: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 ring-amber-500/20",
+        approved: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 ring-emerald-500/20",
+        rejected: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/30 ring-red-500/20"
     };
     const icons = { pending: Clock, approved: CheckCircle, rejected: XCircle };
     const Icon = icons[status] || Clock;
